@@ -878,7 +878,6 @@ function Hero({ onBook }: { onBook: () => void }) {
       <div className="hero__wash" />
 
       <div className="hero__body wrap">
-        <p className="eyebrow">estética essencial · são paulo</p>
         <h1 className="hero__title">
           <span>beleza</span>
           <span>que respira</span>
