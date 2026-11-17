@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent as RUIEvent, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type * as THREE from 'three';
 import {
   ArrowDown,
@@ -1130,23 +1130,6 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
           ))}
         </div>
 
-        <div className="svc-ctrl" data-reveal>
-          <p className="label" aria-live="polite">
-            {pad(index + 1)} / {pad(list.length)}
-          </p>
-          <div className="svc-ctrl__bar" aria-hidden="true">
-            <i style={{ transform: `scaleX(${(index + 1) / list.length})` }} />
-          </div>
-          <div className="svc-ctrl__btns">
-            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Serviço anterior">
-              <ArrowLeft size={18} strokeWidth={1.5} />
-            </button>
-            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index + 1)} disabled={index === last} aria-label="Próximo serviço">
-              <ArrowRight size={18} strokeWidth={1.5} />
-            </button>
-          </div>
-        </div>
-
         <div
           className="svc-rail"
           role="group"
@@ -1227,6 +1210,23 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
               );
             })}
           </ul>
+        </div>
+
+        <div className="svc-ctrl" data-reveal>
+          <p className="label" aria-live="polite">
+            {pad(index + 1)} / {pad(list.length)}
+          </p>
+          <div className="svc-ctrl__bar" aria-hidden="true">
+            <i style={{ transform: `scaleX(${(index + 1) / list.length})` }} />
+          </div>
+          <div className="svc-ctrl__btns">
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Serviço anterior">
+              <ArrowLeft size={18} strokeWidth={1.5} />
+            </button>
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index + 1)} disabled={index === last} aria-label="Próximo serviço">
+              <ArrowRight size={18} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
 
         <p className="services__foot" data-reveal>
@@ -2418,28 +2418,11 @@ function Packages() {
   // O refrator do vidro canelado (filtro SVG aplicado ao fundo) só existe em navegadores Chromium.
   // Nos demais (Safari, Firefox) ficam as estrias e o desfoque, sem distorcer a palavra.
   const [flute, setFlute] = useState(false);
-  const [activePackage, setActivePackage] = useState(0);
-  const packageRail = useRef<HTMLDivElement>(null);
-
-  const selectPackage = (index: number) => {
-    const rail = packageRail.current;
-    const card = rail?.children[index] as HTMLElement | undefined;
-    if (!rail || !card) return;
-    rail.scrollTo({ left: card.offsetLeft - (rail.firstElementChild as HTMLElement).offsetLeft, behavior: 'smooth' });
-    setActivePackage(index);
-  };
-
-  const onPackageScroll = (event: RUIEvent<HTMLDivElement>) => {
-    const rail = event.currentTarget;
-    const firstCard = rail.firstElementChild as HTMLElement | null;
-    if (!firstCard) return;
-    const gap = Number.parseFloat(getComputedStyle(rail).columnGap) || 0;
-    setActivePackage(Math.max(0, Math.min(packages.length - 1, Math.round(rail.scrollLeft / (firstCard.offsetWidth + gap)))));
-  };
-
   useEffect(() => {
-    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands;
-    setFlute(!!brands?.some((b) => b.brand === 'Chromium'));
+    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands ?? [];
+    const userAgent = navigator.userAgent;
+    const isChromium = brands.some((b) => b.brand === 'Chromium') || /Chrome\//.test(userAgent) || /Edg\//.test(userAgent);
+    setFlute(isChromium);
   }, []);
 
   return (
@@ -2467,7 +2450,7 @@ function Packages() {
             </text>
           </svg>
 
-          <div className="pk-grid" ref={packageRail} onScroll={onPackageScroll}>
+          <div className="pk-grid">
             {packages.map((p) => (
               <article key={p.id} className={`pk${p.featured ? ' pk--featured' : ''}`} data-reveal>
                 <p className="pk__tag">{p.tag}</p>
@@ -2496,19 +2479,6 @@ function Packages() {
                   quero este <ArrowUpRight size={16} strokeWidth={1.6} />
                 </a>
               </article>
-            ))}
-          </div>
-          <div className="pk-dots" role="tablist" aria-label="Planos disponíveis">
-            {packages.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`pk-dot${activePackage === i ? ' pk-dot--active' : ''}`}
-                role="tab"
-                aria-label={`Ver plano ${i + 1}: ${p.name}`}
-                aria-selected={activePackage === i}
-                onClick={() => selectPackage(i)}
-              />
             ))}
           </div>
         </div>
@@ -2873,7 +2843,6 @@ function Footer() {
           <a href={`mailto:${contact.email}`}><Mail size={15} strokeWidth={1.4} /> {contact.email}</a>
         </div>
       </div>
-      <div className="footer__word" aria-hidden="true">nativa</div>
       <div className="wrap footer__legal">
         <small>© {new Date().getFullYear()} Nativa Estética</small>
         <small>{contact.cancellation}</small>
@@ -2989,9 +2958,10 @@ export default function App() {
         <Journey onBook={() => book('avaliacao-de-pele')} />
         <BeforeAfter onBook={() => book()} />
         <Packages />
+        <Care />
         <About onBook={() => book()} />
-        <Gallery />
         <Testimonials />
+        <Gallery />
         <FAQ />
         <Place />
         <FinalCTA onBook={() => book()} />
