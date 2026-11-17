@@ -716,16 +716,18 @@ interface PhotoProps {
   pos?: string;
   style?: CSSProperties;
   onLoad?: (img: HTMLImageElement) => void;
+  /** Fundo que vai ser desfocado: baixa só uma versão pequena (largura em px). */
+  lowres?: number;
 }
 
 /** Imagem responsiva com fallback elegante: se não carregar, o fundo do bloco aparece. */
-function Photo({ id, alt, sizes = '100vw', priority, className = '', pos, style, onLoad }: PhotoProps) {
+function Photo({ id, alt, sizes = '100vw', priority, className = '', pos, style, onLoad, lowres }: PhotoProps) {
   const [failed, setFailed] = useState(false);
   return (
     <img
       className={`photo${failed ? ' photo--failed' : ''} ${className}`.trim()}
-      src={photoSrc(id, 960)}
-      srcSet={typeof id === 'number' ? `${pexelsUrl(id, 480)} 480w, ${pexelsUrl(id, 960)} 960w, ${pexelsUrl(id, 1600)} 1600w` : undefined}
+      src={photoSrc(id, lowres ?? 960)}
+      srcSet={typeof id === 'number' && !lowres ? `${pexelsUrl(id, 480)} 480w, ${pexelsUrl(id, 960)} 960w, ${pexelsUrl(id, 1600)} 1600w` : undefined}
       sizes={sizes}
       alt={failed ? '' : alt}
       loading={priority ? 'eager' : 'lazy'}
@@ -977,7 +979,7 @@ function Hero() {
     <section className="hero" id="top">
       {/* fundo: a mesma foto, desfocada e lavada em areia (atmosfera) */}
       <div className="hero__media" ref={media}>
-        <Photo id={photos.hero} alt="" priority pos="center 27%" />
+        <Photo id={photos.hero} alt="" priority lowres={320} pos="center 27%" />
       </div>
       <div className="hero__wash" />
 
@@ -1524,11 +1526,11 @@ function setupScene(
 ): { api: Api; dispose: () => void } | null {
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new T.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'default' });
+    renderer = new T.WebGLRenderer({ antialias: (window.devicePixelRatio || 1) < 2, alpha: true, powerPreference: 'default' });
   } catch {
     return null;
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = T.SRGBColorSpace;
   const canvas = renderer.domElement;
   canvas.className = 'facemap__canvas';
@@ -2407,12 +2409,17 @@ function Journey({ onBook }: { onBook: () => void }) {
       setActiveStep((current) => current === nearest ? current : nearest);
     };
 
+    let raf = 0;
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; updateActiveStep(); });
+    };
     updateActiveStep();
-    window.addEventListener('scroll', updateActiveStep, { passive: true });
-    window.addEventListener('resize', updateActiveStep);
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue);
     return () => {
-      window.removeEventListener('scroll', updateActiveStep);
-      window.removeEventListener('resize', updateActiveStep);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', queue);
+      window.removeEventListener('resize', queue);
     };
   }, []);
 
@@ -2628,11 +2635,11 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
               <div className="ba__slider">
                 {/* cada lado: fundo desfocado da própria foto + a foto inteira, sem corte */}
                 <div className="ba__side ba__side--after">
-                  <Photo id={beforeAfter.after} alt="" className="ba__fill" sizes="30vw" />
+                  <Photo id={beforeAfter.after} alt="" className="ba__fill" lowres={240} />
                   <Photo id={beforeAfter.after} alt="Pele depois do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
                 </div>
                 <div className="ba__side ba__side--before">
-                  <Photo id={beforeAfter.before} alt="" className="ba__fill" sizes="30vw" />
+                  <Photo id={beforeAfter.before} alt="" className="ba__fill" lowres={240} />
                   <Photo id={beforeAfter.before} alt="Pele antes do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
                 </div>
                 <span className="ba__tag ba__tag--l">antes</span>
@@ -2677,7 +2684,15 @@ const fluteMap =
 function Packages() {
   // Mantém o filtro SVG de refração ativo também no mobile.
   // Navegadores sem suporte ao backdrop-filter SVG usam o fallback de estrias abaixo.
-  const flute = true;
+  // Vidro canelado (refração) ligado só enquanto a seção está na tela: fora dela o filtro não custa nada.
+  const [flute, setFlute] = useState(false);
+  useEffect(() => {
+    const el = document.getElementById('pacotes');
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setFlute(e.isIntersecting), { rootMargin: '150px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const [activePackage, setActivePackage] = useState(0);
   const packageRail = useRef<HTMLDivElement>(null);
 
@@ -2908,7 +2923,7 @@ function About({ onBook }: { onBook: () => void }) {
     <section className="about section--ink" id="sobre" ref={root} style={{ '--nn': aboutCount + 6 } as CSSProperties}>
       <div className="about__top" ref={top}>
         <div className="about__bg" aria-hidden="true">
-          <Photo id={photos.ritual} alt="" className="about__bg-img" pos="50% 40%" sizes="100vw" />
+          <Photo id={photos.ritual} alt="" className="about__bg-img" pos="50% 40%" lowres={640} />
         </div>
 
         <div className="wrap about__hero">
@@ -3489,6 +3504,19 @@ function StickyCTA({ onBook }: { onBook: () => void }) {
 
 
 export default function App() {
+
+  // Animações contínuas só rodam enquanto o bloco está na tela.
+  useEffect(() => {
+    const els = document.querySelectorAll('.liquid, .marquee');
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => e.target.classList.toggle('is-off', !e.isIntersecting));
+    });
+    els.forEach((el) => {
+      el.classList.add('is-off');
+      io.observe(el);
+    });
+    return () => io.disconnect();
+  }, []);
   useEffect(() => {
     const root = document.documentElement;
     root.classList.add('js');
