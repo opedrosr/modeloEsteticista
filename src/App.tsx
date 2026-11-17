@@ -2505,6 +2505,12 @@ function Packages() {
         </filter>
       </svg>
 
+      <div className="liquid" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
+
       <div className="wrap">
         <header className="pk-head" data-reveal>
           <p className="label label--light">07 / pacotes</p>
@@ -2551,6 +2557,10 @@ function Packages() {
               </article>
             ))}
           </div>
+          <div className="pk-nav">
+          <p className="pk-count" aria-live="polite">
+            <b>{String(activePackage + 1).padStart(2, '0')}</b> / {String(packages.length).padStart(2, '0')}
+          </p>
           <div className="pk-dots" role="tablist" aria-label="Planos disponíveis">
             {packages.map((p, i) => (
               <button
@@ -2563,6 +2573,7 @@ function Packages() {
                 onClick={() => selectPackage(i)}
               />
             ))}
+          </div>
           </div>
         </div>
 

@@ -1851,6 +1851,14 @@ img {
    nos demais ficam as estrias e o desfoque.
    ========================================================================== */
 
+/* manchas de cor atrás da palavra: o vidro as refrata e o conjunto fica líquido */
+.packages { isolation: isolate; overflow: hidden; }
+.packages .wrap { position: relative; z-index: 1; }
+.packages .liquid { opacity: 0.6; }
+.packages .liquid i:nth-child(1) { left: -200px; top: 6%; }
+.packages .liquid i:nth-child(2) { right: -220px; top: 34%; }
+.packages .liquid i:nth-child(3) { bottom: 4%; left: 20%; }
+
 .pk-head { display: grid; gap: 14px; margin-bottom: 40px; }
 .pk-head .lead { color: var(--on-ink-muted); max-width: 360px; }
 
@@ -1860,25 +1868,26 @@ img {
 .pk-word text { fill: var(--sand); }
 
 /* os cartões sobem sobre a metade de baixo das letras */
-.pk-grid { display: grid; gap: 16px; margin-top: -4.5cqw; position: relative; z-index: 1; }
-.pk:first-child { padding-top: 34px; }
+.pk-grid { display: grid; gap: 16px; margin-top: -13cqw; position: relative; z-index: 1; }
 
 .pk {
   -webkit-backdrop-filter: blur(5px) brightness(1.1);
   backdrop-filter: blur(5px) brightness(1.1);
-  background: linear-gradient(180deg, rgba(37, 37, 34, 0.5) 0%, rgba(37, 37, 34, 0.74) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 28px;
+  background:
+    radial-gradient(120% 40% at 18% 0%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, rgba(37, 37, 34, 0.46) 0%, rgba(37, 37, 34, 0.72) 100%);
+  border-radius: 32px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    inset 1px 0 0 rgba(255, 255, 255, 0.1),
-    inset -1px 0 0 rgba(255, 255, 255, 0.06),
-    0 30px 60px rgba(0, 0, 0, 0.45);
+    inset 0 1px 1px rgba(255, 255, 255, 0.65),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.22),
+    inset 0 0 34px rgba(255, 255, 255, 0.07),
+    0 30px 60px rgba(0, 0, 0, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   isolation: isolate;
   overflow: hidden;
-  padding: 28px 22px 22px;
+  padding: calc(11.5cqw + 20px) 22px 22px;
   position: relative;
 }
 
@@ -1893,15 +1902,19 @@ img {
   z-index: 0;
 }
 
-/* luz que desce pelo vidro */
+/* aro de luz: brilha em cantos opostos, como o vidro líquido do agendamento */
 .pk::after {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 38%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 64%, rgba(255, 255, 255, 0.75) 100%);
   border-radius: inherit;
   content: '';
   inset: 0;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  padding: 1.5px;
   pointer-events: none;
   position: absolute;
-  z-index: 0;
+  z-index: 2;
 }
 
 .pk > * { position: relative; z-index: 1; }
@@ -1953,56 +1966,86 @@ img {
 .pk .btn--light { box-shadow: inset 0 1px 1px #fff, 0 10px 26px rgba(0, 0, 0, 0.3); }
 .pk .btn--ghost-light { background: rgba(255, 255, 255, 0.06); }
 
-.pk-dots { display: none; }
+/* contador + linha de progresso (só no carrossel do celular) */
+.pk-nav { display: none; }
 
 @media (max-width: 719px) {
+  /* Trilho horizontal: cada gesto leva a exatamente um cartão. A rolagem só anda no eixo lateral
+     (overflow-y travado), para o dedo não "puxar" a página nem deixar o cartão no meio do caminho. */
   .pk-grid {
-    margin-top: -12cqw;
+    --pk-peek: 30px;
     display: flex;
-    gap: 16px;
+    gap: 14px;
+    margin-inline: calc(var(--gutter) * -1);
+    margin-top: -13cqw;
     overflow-x: auto;
+    overflow-y: hidden;
     overscroll-behavior-x: contain;
-    padding-bottom: 12px;
-    scroll-padding-inline: 2px;
+    padding: 8px var(--gutter) 46px;
+    scroll-padding-inline: var(--gutter);
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
+    touch-action: pan-x pan-y;
     -webkit-overflow-scrolling: touch;
   }
 
   .pk-grid::-webkit-scrollbar { display: none; }
 
   .pk-grid > .pk {
-    /* Mesmo filtro de refração canelada do desktop, também no carrossel mobile. */
+    /* mesmo vidro canelado do desktop; Safari sem suporte cai no desfoque + estrias */
     -webkit-backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
     backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
-    flex: 0 0 88%;
+    flex: 0 0 calc(100% - var(--gutter) * 2 - var(--pk-peek));
     min-width: 0;
-    scroll-snap-align: center;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
   }
 
-  .pk-dots {
+  /* o rail passa a ter largura da tela, então 100cqw do palco continua sendo a largura do texto */
+  .pk-nav {
     align-items: center;
     display: flex;
-    gap: 9px;
-    justify-content: center;
-    padding-top: 12px;
+    gap: 16px;
+    margin-top: -22px;
     position: relative;
     z-index: 2;
   }
 
+  .pk-count { color: var(--on-ink-muted); font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; min-width: 48px; }
+  .pk-count b { color: var(--on-ink); font-weight: 400; }
+
+  /* linha segmentada: cada trecho é um plano; o ativo "enche" como líquido */
+  .pk-dots { display: flex; flex: 1; gap: 6px; }
+
   .pk-dot {
-    background: rgba(243, 241, 235, 0.35);
-    border-radius: 50%;
-    height: 7px;
+    background: rgba(243, 241, 235, 0.18);
+    border-radius: 999px;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25);
+    flex: 1;
+    height: 4px;
+    overflow: hidden;
     padding: 0;
-    transition: background 0.25s, transform 0.25s;
-    width: 7px;
+    position: relative;
+    /* área de toque maior que a linha */
+    background-clip: content-box;
+    border-block: 20px solid transparent;
+    box-sizing: content-box;
+    transition: flex 0.5s var(--ease);
   }
 
-  .pk-dot--active {
+  .pk-dot::after {
     background: var(--sand);
-    transform: scale(1.25);
+    border-radius: inherit;
+    content: '';
+    inset: 0;
+    position: absolute;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.5s var(--ease);
   }
+
+  .pk-dot--active { flex: 2.2; }
+  .pk-dot--active::after { transform: scaleX(1); }
 }
 
 .gift {
