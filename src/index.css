@@ -982,14 +982,57 @@ img {
    MAPA DA PELE (3D)
    ========================================================================== */
 
-.facemap__grid { display: grid; gap: 24px; }
-
-.facemap__view {
-  background: radial-gradient(120% 90% at 50% 38%, #fbfaf6 0%, var(--mist) 58%, var(--stone) 100%);
-  height: min(74svh, 560px);
-  min-height: 420px;
+/* moldura escura (sálvia → tinta) com palavra gigante atrás do busto, no mesmo espírito do hero */
+.facemap__frame {
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgba(184, 189, 181, 0.32), transparent 72%),
+    radial-gradient(130% 100% at 50% 0%, #66735f 0%, var(--accent) 42%, #2b312a 100%);
+  border-radius: 28px;
+  color: var(--on-ink);
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
   overflow: hidden;
   position: relative;
+}
+
+.facemap__word {
+  background: linear-gradient(180deg, #f6f4ee 18%, #c4c9bf 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: var(--display);
+  font-size: 40cqw;
+  font-weight: 900;
+  left: 0;
+  letter-spacing: -0.045em;
+  line-height: 0.8;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  text-align: center;
+  top: 54px;
+  user-select: none;
+  z-index: 0;
+}
+
+.facemap__brand {
+  font-family: var(--serif);
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  margin: 0;
+  padding-top: 22px;
+  position: relative;
+  text-align: center;
+  z-index: 2;
+}
+
+.facemap__view {
+  height: 440px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .facemap__stage { height: 100%; position: relative; width: 100%; }
@@ -1007,7 +1050,7 @@ img {
 .facemap__hint {
   z-index: 1;
   bottom: 14px;
-  color: var(--muted);
+  color: var(--on-ink-muted);
   font-family: var(--mono);
   font-size: 11px;
   left: 0;
@@ -1022,7 +1065,7 @@ img {
 
 .facemap__loading {
   align-items: center;
-  color: var(--muted);
+  color: var(--on-ink-muted);
   display: flex;
   font-family: var(--mono);
   font-size: 12px;
@@ -1032,47 +1075,163 @@ img {
   text-transform: uppercase;
 }
 
-.facemap__side { display: grid; gap: 22px; align-content: start; }
-
-.zone {
-  background: var(--sand);
-  border: 1px solid var(--line);
-  min-height: 250px;
-  padding: 24px;
+.facemap__rail {
+  display: grid;
+  gap: 16px;
+  padding: 4px 16px 16px;
+  position: relative;
+  z-index: 2;
 }
+
+.facemap__regions { display: grid; gap: 12px; }
+
+/* chips em vidro sobre a moldura escura */
+.facemap__frame .chip {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  background: rgba(243, 241, 235, 0.1);
+  border-color: rgba(243, 241, 235, 0.32);
+  color: var(--on-ink);
+}
+
+.facemap__frame .chip--on {
+  background: var(--sand);
+  border-color: var(--sand);
+  color: var(--ink);
+}
+
+.facemap__cta { justify-self: start; }
+
+/* resultado: cartão de vidro flutuante, como o cartão de consulta da referência */
+.facemap__frame .zone {
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  background: rgba(243, 241, 235, 0.12);
+  border: 1px solid rgba(243, 241, 235, 0.26);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(20, 24, 19, 0.28);
+  margin: 0 16px 16px;
+  min-height: 190px;
+  padding: 22px;
+  position: relative;
+  z-index: 2;
+}
+
+.facemap__frame .zone .label,
+.facemap__frame .zone .body { color: var(--on-ink-muted); }
 
 .zone__title {
   font-family: var(--serif);
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 400;
   letter-spacing: -0.03em;
   line-height: 1.05;
   margin: 8px 0 10px;
 }
 
-.zone__list { border-top: 1px solid var(--line); margin-top: 20px; }
+.zone__list { border-top: 1px solid rgba(243, 241, 235, 0.22); margin-top: 18px; }
 
 .zone__list li {
   align-items: center;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(243, 241, 235, 0.22);
   display: flex;
   gap: 14px;
   justify-content: space-between;
-  padding: 14px 0;
+  padding: 12px 0;
 }
+
+.zone__list li:last-child { border-bottom: 0; padding-bottom: 0; }
 
 .zone__list strong { display: block; font-weight: 500; }
 
 .zone__list small {
   align-items: center;
-  color: var(--muted);
+  color: var(--on-ink-muted);
   display: inline-flex;
   font-family: var(--mono);
   font-size: 12px;
   gap: 6px;
 }
 
-.zone__empty .btn { margin-top: 20px; }
+.facemap__frame .zone .btn--primary { background: var(--sand); color: var(--ink); }
+
+/* aba com cantos invertidos no rodapé, no formato da referência (só no desktop) */
+.facemap__notch { display: none; }
+
+@media (min-width: 720px) {
+  .facemap__frame { border-radius: 36px; }
+  .facemap__view { height: 560px; }
+  .facemap__canvas { filter: drop-shadow(0 22px 28px rgba(18, 22, 17, 0.42)); }
+  .facemap__word { top: 64px; }
+  .facemap__brand { font-size: 24px; padding-top: 28px; }
+  .facemap__rail { padding: 4px 28px 24px; }
+  .facemap__frame .zone { margin: 0 28px 28px; }
+}
+
+@media (min-width: 1100px) {
+  .facemap__frame { border-radius: 44px; display: block; height: 720px; }
+  .facemap__word { top: 92px; }
+  .facemap__view { height: auto; inset: 0; position: absolute; }
+  .facemap__hint { bottom: 52px; }
+
+  .facemap__rail {
+    bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    left: 40px;
+    padding: 0;
+    position: absolute;
+    top: 110px;
+    width: 190px;
+  }
+
+  .facemap__regions .chips { flex-direction: column; align-items: flex-start; }
+
+  .facemap__frame .zone {
+    bottom: 40px;
+    margin: 0;
+    min-height: 0;
+    position: absolute;
+    right: 40px;
+    width: 350px;
+  }
+
+  .facemap__notch {
+    align-items: center;
+    background: var(--sand);
+    border-radius: 24px 24px 0 0;
+    bottom: 0;
+    color: var(--ink);
+    display: flex;
+    height: 38px;
+    justify-content: center;
+    left: 50%;
+    position: absolute;
+    transform: translateX(-50%);
+    width: 92px;
+    z-index: 3;
+  }
+
+  .facemap__notch::before,
+  .facemap__notch::after {
+    bottom: 0;
+    content: '';
+    height: 24px;
+    position: absolute;
+    width: 24px;
+  }
+
+  .facemap__notch::before {
+    background: radial-gradient(circle at 0 0, transparent 23px, var(--sand) 23.5px);
+    left: -24px;
+  }
+
+  .facemap__notch::after {
+    background: radial-gradient(circle at 100% 0, transparent 23px, var(--sand) 23.5px);
+    right: -24px;
+  }
+}
 
 /* ==========================================================================
    AGENDAMENTO — vidro líquido: cartão fosco sobre manchas de cor em movimento.
@@ -2915,9 +3074,6 @@ img {
   .svc-body__wa span { display: inline; }
   .svc-body__wa { padding: 0 22px; }
 
-  .facemap__grid { align-items: stretch; grid-template-columns: 1.05fr 0.95fr; gap: 56px; }
-  .facemap__view { height: 680px; }
-  .facemap__side { align-content: center; }
 
   .bk__title { font-size: 46px; }
   .opts { grid-template-columns: 1fr 1fr; }

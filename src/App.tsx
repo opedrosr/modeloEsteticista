@@ -1316,7 +1316,7 @@ function FaceMap({ onBook }: { onBook: (serviceId?: string) => void }) {
 
   // No celular o resultado aparece abaixo do rosto: ao escolher uma região, mostra o resultado.
   useEffect(() => {
-    if (!selectedId || window.innerWidth >= 1024) return;
+    if (!selectedId || window.innerWidth >= 1100) return;
     const el = zoneRef.current;
     if (!el) return;
     const id = window.setTimeout(() => {
@@ -1346,8 +1346,15 @@ function FaceMap({ onBook }: { onBook: (serviceId?: string) => void }) {
           lead="Toque em uma região do rosto e veja os protocolos indicados. É um ponto de partida para a nossa conversa na avaliação."
         />
 
-        <div className="facemap__grid">
-          <div className="facemap__view" ref={wrap} data-reveal>
+        <div className="facemap__frame" data-reveal>
+          <div className="facemap__word" aria-hidden="true">
+            pele
+          </div>
+          <p className="facemap__brand" aria-hidden="true">
+            mapa da pele.
+          </p>
+
+          <div className="facemap__view" ref={wrap}>
             {!failed && mount ? (
               <FaceMap3D selectedId={selectedId} onSelect={setSelectedId} onFail={() => setFailed(true)} />
             ) : (
@@ -1355,56 +1362,64 @@ function FaceMap({ onBook }: { onBook: (serviceId?: string) => void }) {
             )}
           </div>
 
-          <div className="facemap__side">
-            <div className="chips" role="group" aria-label="Regiões do rosto">
-              {faceZones.map((z) => (
-                <button
-                  key={z.id}
-                  type="button"
-                  className={`chip${selectedId === z.id ? ' chip--on' : ''}`}
-                  aria-pressed={selectedId === z.id}
-                  onClick={() => setSelectedId(selectedId === z.id ? null : z.id)}
-                >
-                  {z.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="zone" aria-live="polite" ref={zoneRef}>
-              {zone ? (
-                <>
-                  <p className="label">{zone.label}</p>
-                  <h3 className="zone__title">{zone.title}</h3>
-                  <p className="body">{zone.text}</p>
-                  <ul className="zone__list">
-                    {zoneServices.map((s) =>
-                      s ? (
-                        <li key={s.id}>
-                          <div>
-                            <strong>{s.name}</strong>
-                            <small>
-                              <Clock size={13} strokeWidth={1.5} /> {s.minutes} min · {priceLabel(s.price)}
-                            </small>
-                          </div>
-                          <button type="button" className="btn btn--sm btn--primary" onClick={() => onBook(s.id)}>
-                            agendar <ArrowUpRight size={14} strokeWidth={1.6} />
-                          </button>
-                        </li>
-                      ) : null,
-                    )}
-                  </ul>
-                </>
-              ) : (
-                <div className="zone__empty">
-                  <p className="zone__title">escolha uma região</p>
-                  <p className="body">Toque nos pontos do rosto ou nos botões acima. Ao escolher, mostramos os protocolos indicados.</p>
-                  <button type="button" className="btn btn--ghost" onClick={() => onBook('avaliacao-de-pele')}>
-                    prefiro uma avaliação <ArrowUpRight size={16} strokeWidth={1.6} />
+          <div className="facemap__rail">
+            <div className="facemap__regions">
+              <p className="label label--light">regiões do rosto</p>
+              <div className="chips" role="group" aria-label="Regiões do rosto">
+                {faceZones.map((z) => (
+                  <button
+                    key={z.id}
+                    type="button"
+                    className={`chip${selectedId === z.id ? ' chip--on' : ''}`}
+                    aria-pressed={selectedId === z.id}
+                    onClick={() => setSelectedId(selectedId === z.id ? null : z.id)}
+                  >
+                    {z.label}
                   </button>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
+            <button type="button" className="btn btn--ghost-light facemap__cta" onClick={() => onBook('avaliacao-de-pele')}>
+              prefiro uma avaliação <ArrowUpRight size={16} strokeWidth={1.6} />
+            </button>
           </div>
+
+          <div className="zone" aria-live="polite" ref={zoneRef}>
+            {zone ? (
+              <>
+                <p className="label">{zone.label}</p>
+                <h3 className="zone__title">{zone.title}</h3>
+                <p className="body">{zone.text}</p>
+                <ul className="zone__list">
+                  {zoneServices.map((s) =>
+                    s ? (
+                      <li key={s.id}>
+                        <div>
+                          <strong>{s.name}</strong>
+                          <small>
+                            <Clock size={13} strokeWidth={1.5} /> {s.minutes} min · {priceLabel(s.price)}
+                          </small>
+                        </div>
+                        <button type="button" className="btn btn--sm btn--primary" onClick={() => onBook(s.id)}>
+                          agendar <ArrowUpRight size={14} strokeWidth={1.6} />
+                        </button>
+                      </li>
+                    ) : null,
+                  )}
+                </ul>
+              </>
+            ) : (
+              <div className="zone__empty">
+                <p className="label">ponto de partida</p>
+                <p className="zone__title">escolha uma região</p>
+                <p className="body">Toque nos pontos do rosto ou nos botões ao lado. Ao escolher, mostramos os protocolos indicados.</p>
+              </div>
+            )}
+          </div>
+
+          <a className="facemap__notch" href="#agendar" aria-label="ir para o agendamento">
+            <ArrowDown size={16} strokeWidth={1.6} />
+          </a>
         </div>
       </div>
     </section>
