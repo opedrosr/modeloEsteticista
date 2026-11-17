@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent as RUIEvent, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type * as THREE from 'three';
 import {
   ArrowDown,
@@ -866,12 +866,71 @@ function Header({ onBook }: { onBook: () => void }) {
 /** Palavra do hero: fonte da marca. 330 unidades de fonte + textLength 988 = encaixe de ponta a ponta, sem comprimir o espaçamento. */
 const heroWordStyle: CSSProperties = { fontFamily: 'var(--serif)', fontSize: 330 };
 
-function Hero({ onBook }: { onBook: () => void }) {
+function Hero() {
   const media = useRef<HTMLDivElement>(null);
   const shift = useRef<SVGGElement>(null);
+  const word = useRef<SVGSVGElement>(null);
 
   // Parallax sem re-render do React: o fundo desfocado desce devagar e a foto dentro das letras
   // acompanha o scroll (vertical) e o mouse (horizontal), como se as letras fossem uma janela.
+  // A palavra do hero acompanha o movimento e se encaixa na marca do cabeçalho.
+  useEffect(() => {
+    const source = word.current;
+    const brand = document.querySelector<HTMLElement>('.nav .brand');
+    if (!source || !brand || prefersReducedMotion()) return;
+
+    const clone = source.cloneNode(true) as SVGSVGElement;
+    clone.removeAttribute('class');
+    Object.assign(clone.style, {
+      animation: 'none',
+      display: 'block',
+      left: '0',
+      maxWidth: 'none',
+      opacity: '0',
+      pointerEvents: 'none',
+      position: 'fixed',
+      top: '0',
+      transformOrigin: 'top left',
+      width: '0px',
+      zIndex: '60',
+    });
+    document.body.appendChild(clone);
+
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const from = source.getBoundingClientRect();
+      const to = brand.getBoundingClientRect();
+      const start = window.innerHeight * 0.62;
+      const end = Math.max(8, to.top + to.height / 2);
+      const progress = Math.max(0, Math.min(1, (start - from.top) / Math.max(1, start - end)));
+      const scale = to.width / Math.max(1, from.width);
+      clone.style.left = `${from.left}px`;
+      clone.style.top = `${from.top}px`;
+      clone.style.width = `${from.width}px`;
+      clone.style.opacity = String(progress < 0.85 ? 1 : (1 - progress) / 0.15);
+      clone.style.transform = `translate3d(${(to.left - from.left) * progress}px, ${(to.top - from.top) * progress}px, 0) scale(${1 + (scale - 1) * progress})`;
+      source.style.opacity = '0';
+      brand.style.opacity = String(progress <= 0.5 ? 1 - progress * 2 : (progress - 0.5) * 2);
+      brand.style.transition = 'opacity 0.08s linear';
+    };
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue);
+    return () => {
+      window.removeEventListener('scroll', queue);
+      window.removeEventListener('resize', queue);
+      cancelAnimationFrame(raf);
+      source.style.opacity = '';
+      brand.style.opacity = '';
+      brand.style.transition = '';
+      clone.remove();
+    };
+  }, []);
+
   useEffect(() => {
     if (prefersReducedMotion()) return;
     const fine = window.matchMedia('(pointer: fine)').matches;
@@ -915,14 +974,7 @@ function Hero({ onBook }: { onBook: () => void }) {
           Skincare consciente e protocolos autorais, com uma avaliação feita para a sua pele.
         </p>
 
-        <div className="hero__cta">
-          <button type="button" className="btn btn--primary" onClick={onBook}>
-            agendar avaliação <ArrowUpRight size={16} strokeWidth={1.6} />
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={() => scrollToId('mapa')}>
-            descobrir meu protocolo
-          </button>
-        </div>
+        <div className="hero__cta" aria-hidden="true" />
       </div>
 
       <div className="hero__meta wrap">
@@ -946,7 +998,7 @@ function Hero({ onBook }: { onBook: () => void }) {
       <div className="hero__word">
         <h1 className="hero__title">
           <span className="sr-only">nativa, beleza que respira</span>
-          <svg className="hero__svg" viewBox="0 0 1000 300" aria-hidden="true" focusable="false">
+          <svg ref={word} className="hero__svg" viewBox="0 0 1000 300" aria-hidden="true" focusable="false">
             <defs>
               <mask id="hero-word" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="340">
                 <text
@@ -1130,6 +1182,23 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
           ))}
         </div>
 
+        <div className="svc-ctrl" data-reveal>
+          <p className="label" aria-live="polite">
+            {pad(index + 1)} / {pad(list.length)}
+          </p>
+          <div className="svc-ctrl__bar" aria-hidden="true">
+            <i style={{ transform: `scaleX(${(index + 1) / list.length})` }} />
+          </div>
+          <div className="svc-ctrl__btns">
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Serviço anterior">
+              <ArrowLeft size={18} strokeWidth={1.5} />
+            </button>
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index + 1)} disabled={index === last} aria-label="Próximo serviço">
+              <ArrowRight size={18} strokeWidth={1.5} />
+            </button>
+          </div>
+        </div>
+
         <div
           className="svc-rail"
           role="group"
@@ -1210,23 +1279,6 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
               );
             })}
           </ul>
-        </div>
-
-        <div className="svc-ctrl" data-reveal>
-          <p className="label" aria-live="polite">
-            {pad(index + 1)} / {pad(list.length)}
-          </p>
-          <div className="svc-ctrl__bar" aria-hidden="true">
-            <i style={{ transform: `scaleX(${(index + 1) / list.length})` }} />
-          </div>
-          <div className="svc-ctrl__btns">
-            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Serviço anterior">
-              <ArrowLeft size={18} strokeWidth={1.5} />
-            </button>
-            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index + 1)} disabled={index === last} aria-label="Próximo serviço">
-              <ArrowRight size={18} strokeWidth={1.5} />
-            </button>
-          </div>
         </div>
 
         <p className="services__foot" data-reveal>
@@ -2326,6 +2378,38 @@ function Booking({ preset }: { preset: BookingPreset }) {
 
 
 function Journey({ onBook }: { onBook: () => void }) {
+  const [activeStep, setActiveStep] = useState(0);
+  const stepRefs = useRef<Array<HTMLLIElement | null>>([]);
+  const journeyImages = [photos.hero, photos.philosophy, photos.ritual, photos.facial];
+
+  useEffect(() => {
+    const updateActiveStep = () => {
+      const focusY = window.innerHeight * 0.46;
+      let nearest = 0;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      stepRefs.current.forEach((step, index) => {
+        if (!step) return;
+        const rect = step.getBoundingClientRect();
+        const distance = Math.abs((rect.top + rect.height * 0.42) - focusY);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearest = index;
+        }
+      });
+
+      setActiveStep((current) => current === nearest ? current : nearest);
+    };
+
+    updateActiveStep();
+    window.addEventListener('scroll', updateActiveStep, { passive: true });
+    window.addEventListener('resize', updateActiveStep);
+    return () => {
+      window.removeEventListener('scroll', updateActiveStep);
+      window.removeEventListener('resize', updateActiveStep);
+    };
+  }, []);
+
   return (
     <section className="journey section" id="jornada">
       <div className="wrap">
@@ -2341,15 +2425,46 @@ function Journey({ onBook }: { onBook: () => void }) {
           }
           lead="Um caminho simples e acompanhado, do primeiro contato ao pós-sessão."
         />
-        <ol className="journey__list">
-          {journey.map((j) => (
-            <li key={j.n} data-reveal>
-              <span className="journey__n">{j.n}</span>
-              <h3>{j.title}</h3>
-              <p>{j.text}</p>
-            </li>
-          ))}
-        </ol>
+
+        <div className="journey__scrolly">
+          <div className="journey__visual" aria-live="polite">
+            <div className="journey__image">
+              <Photo
+                key={activeStep}
+                id={journeyImages[activeStep]}
+                alt={`Etapa ${journey[activeStep].n}: ${journey[activeStep].title}`}
+                sizes="(min-width: 900px) 42vw, 90vw"
+              />
+              <div className="journey__image-shade" />
+              <div className="journey__visual-meta">
+                <span className="journey__visual-count">{journey[activeStep].n} / 04</span>
+                <span className="journey__visual-title">{journey[activeStep].title}</span>
+              </div>
+            </div>
+            <div className="journey__progress" aria-hidden="true">
+              <i style={{ transform: `scaleY(${(activeStep + 1) / journey.length})` }} />
+            </div>
+          </div>
+
+          <ol className="journey__list">
+            {journey.map((j, index) => (
+              <li
+                key={j.n}
+                ref={(element) => { stepRefs.current[index] = element; }}
+                className={activeStep === index ? 'journey__step--active' : ''}
+                aria-current={activeStep === index ? 'step' : undefined}
+              >
+                <span className="journey__n">{j.n}</span>
+                <div className="journey__step-copy">
+                  <p className="journey__eyebrow">etapa {j.n}</p>
+                  <h3>{j.title}</h3>
+                  <p>{j.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
         <div className="center" data-reveal>
           <button type="button" className="btn btn--primary btn--lg" onClick={onBook}>
             começar pela avaliação <ArrowUpRight size={18} strokeWidth={1.6} />
@@ -2418,11 +2533,28 @@ function Packages() {
   // O refrator do vidro canelado (filtro SVG aplicado ao fundo) só existe em navegadores Chromium.
   // Nos demais (Safari, Firefox) ficam as estrias e o desfoque, sem distorcer a palavra.
   const [flute, setFlute] = useState(false);
+  const [activePackage, setActivePackage] = useState(0);
+  const packageRail = useRef<HTMLDivElement>(null);
+
+  const selectPackage = (index: number) => {
+    const rail = packageRail.current;
+    const card = rail?.children[index] as HTMLElement | undefined;
+    if (!rail || !card) return;
+    rail.scrollTo({ left: card.offsetLeft - (rail.firstElementChild as HTMLElement).offsetLeft, behavior: 'smooth' });
+    setActivePackage(index);
+  };
+
+  const onPackageScroll = (event: RUIEvent<HTMLDivElement>) => {
+    const rail = event.currentTarget;
+    const firstCard = rail.firstElementChild as HTMLElement | null;
+    if (!firstCard) return;
+    const gap = Number.parseFloat(getComputedStyle(rail).columnGap) || 0;
+    setActivePackage(Math.max(0, Math.min(packages.length - 1, Math.round(rail.scrollLeft / (firstCard.offsetWidth + gap)))));
+  };
+
   useEffect(() => {
-    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands ?? [];
-    const userAgent = navigator.userAgent;
-    const isChromium = brands.some((b) => b.brand === 'Chromium') || /Chrome\//.test(userAgent) || /Edg\//.test(userAgent);
-    setFlute(isChromium);
+    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands;
+    setFlute(!!brands?.some((b) => b.brand === 'Chromium'));
   }, []);
 
   return (
@@ -2450,7 +2582,7 @@ function Packages() {
             </text>
           </svg>
 
-          <div className="pk-grid">
+          <div className="pk-grid" ref={packageRail} onScroll={onPackageScroll}>
             {packages.map((p) => (
               <article key={p.id} className={`pk${p.featured ? ' pk--featured' : ''}`} data-reveal>
                 <p className="pk__tag">{p.tag}</p>
@@ -2479,6 +2611,19 @@ function Packages() {
                   quero este <ArrowUpRight size={16} strokeWidth={1.6} />
                 </a>
               </article>
+            ))}
+          </div>
+          <div className="pk-dots" role="tablist" aria-label="Planos disponíveis">
+            {packages.map((p, i) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`pk-dot${activePackage === i ? ' pk-dot--active' : ''}`}
+                role="tab"
+                aria-label={`Ver plano ${i + 1}: ${p.name}`}
+                aria-selected={activePackage === i}
+                onClick={() => selectPackage(i)}
+              />
             ))}
           </div>
         </div>
@@ -2542,7 +2687,7 @@ function About({ onBook }: { onBook: () => void }) {
         </figure>
 
         <div className="about__copy" data-reveal>
-          <p className="label">09 / sobre</p>
+          <p className="label">01 / sobre</p>
           <h2 className="h2">
             quem cuida
             <br />
@@ -2843,6 +2988,7 @@ function Footer() {
           <a href={`mailto:${contact.email}`}><Mail size={15} strokeWidth={1.4} /> {contact.email}</a>
         </div>
       </div>
+      <div className="footer__word" aria-hidden="true">nativa</div>
       <div className="wrap footer__legal">
         <small>© {new Date().getFullYear()} Nativa Estética</small>
         <small>{contact.cancellation}</small>
@@ -2944,24 +3090,22 @@ export default function App() {
 
   return (
     <>
-      <a className="skip" href="#essencia">
+      <a className="skip" href="#sobre">
         ir para o conteúdo
       </a>
       <Header onBook={() => book()} />
       <main>
-        <Hero onBook={() => book()} />
+        <Hero />
         <Marquee />
-        <Essence onBook={() => book()} />
+        <About onBook={() => book()} />
         <Services onBook={book} />
         <FaceMap onBook={book} />
         <Booking preset={preset} />
         <Journey onBook={() => book('avaliacao-de-pele')} />
         <BeforeAfter onBook={() => book()} />
         <Packages />
-        <Care />
-        <About onBook={() => book()} />
-        <Testimonials />
         <Gallery />
+        <Testimonials />
         <FAQ />
         <Place />
         <FinalCTA onBook={() => book()} />
