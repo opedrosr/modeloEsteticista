@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type * as THREE from 'three';
 import {
   ArrowDown,
@@ -757,12 +757,23 @@ const links = [
 function Header({ onBook }: { onBook: () => void }) {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
     let raf = 0;
     const update = () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setScrolled(window.scrollY > 40));
+      raf = requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 40);
+        // seção ativa: a que cruza uma linha a 35% da altura da tela (independe da ordem da página)
+        const probe = window.innerHeight * 0.35;
+        let current: string | null = null;
+        for (const l of links) {
+          const r = document.getElementById(l.id)?.getBoundingClientRect();
+          if (r && r.top <= probe && r.bottom > probe) current = l.id;
+        }
+        setActive(current);
+      });
     };
     update();
     window.addEventListener('scroll', update, { passive: true });
@@ -800,7 +811,13 @@ function Header({ onBook }: { onBook: () => void }) {
 
           <nav className="nav__links" aria-label="Principal">
             {links.slice(0, 5).map((l) => (
-              <a key={l.id} href={`#${l.id}`} onClick={go(l.id)}>
+              <a
+                key={l.id}
+                href={`#${l.id}`}
+                onClick={go(l.id)}
+                className={active === l.id ? 'is-active' : undefined}
+                aria-current={active === l.id ? 'true' : undefined}
+              >
                 {l.label}
               </a>
             ))}
@@ -846,53 +863,72 @@ function Header({ onBook }: { onBook: () => void }) {
   );
 }
 
+/** Palavra do hero: fonte da marca. 330 unidades de fonte + textLength 988 = encaixe de ponta a ponta, sem comprimir o espaçamento. */
+const heroWordStyle: CSSProperties = { fontFamily: 'var(--serif)', fontSize: 330 };
+
 function Hero({ onBook }: { onBook: () => void }) {
   const media = useRef<HTMLDivElement>(null);
+  const shift = useRef<SVGGElement>(null);
 
-  // Parallax sem re-render do React: escreve direto no estilo do elemento.
+  // Parallax sem re-render do React: o fundo desfocado desce devagar e a foto dentro das letras
+  // acompanha o scroll (vertical) e o mouse (horizontal), como se as letras fossem uma janela.
   useEffect(() => {
     if (prefersReducedMotion()) return;
+    const fine = window.matchMedia('(pointer: fine)').matches;
     let raf = 0;
-    const tick = () => {
+    let px = 0;
+    const draw = () => {
       raf = 0;
       const y = window.scrollY;
-      if (media.current && y < window.innerHeight * 1.2) {
-        media.current.style.transform = `translate3d(0, ${y * 0.08}px, 0) scale(1.06)`;
-      }
+      if (y > window.innerHeight * 1.2) return;
+      if (media.current) media.current.style.transform = `translate3d(0, ${y * 0.08}px, 0) scale(1.06)`;
+      shift.current?.setAttribute('transform', `translate(${px.toFixed(1)} ${Math.min(y * 0.1, 70).toFixed(1)})`);
     };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(tick);
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(draw);
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
+    const onMove = (e: PointerEvent) => {
+      px = (e.clientX / window.innerWidth - 0.5) * -36;
+      queue();
+    };
+    window.addEventListener('scroll', queue, { passive: true });
+    if (fine) window.addEventListener('pointermove', onMove, { passive: true });
     return () => {
-      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', queue);
+      window.removeEventListener('pointermove', onMove);
       cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
     <section className="hero" id="top">
+      {/* fundo: a mesma foto, desfocada e lavada em areia (atmosfera) */}
       <div className="hero__media" ref={media}>
-        <Photo id={photos.hero} alt="Retrato em close da beleza natural da pele" priority pos="center 27%" />
+        <Photo id={photos.hero} alt="" priority pos="center 27%" />
       </div>
       <div className="hero__wash" />
 
       <div className="hero__body wrap">
-        <h1 className="hero__title">
-          <span>beleza</span>
-          <span>que respira</span>
-        </h1>
-        <p className="hero__lead">Skincare consciente e protocolos autorais, com uma avaliação feita para a sua pele.</p>
+        <p className="eyebrow">estética facial &amp; corporal</p>
+        <p className="hero__lead">
+          <strong>beleza que respira.</strong>
+          Skincare consciente e protocolos autorais, com uma avaliação feita para a sua pele.
+        </p>
 
         <div className="hero__cta">
-          <button type="button" className="btn btn--light" onClick={onBook}>
+          <button type="button" className="btn btn--primary" onClick={onBook}>
             agendar avaliação <ArrowUpRight size={16} strokeWidth={1.6} />
           </button>
-          <button type="button" className="btn btn--ghost-light" onClick={() => scrollToId('mapa')}>
+          <button type="button" className="btn btn--ghost" onClick={() => scrollToId('mapa')}>
             descobrir meu protocolo
           </button>
         </div>
+      </div>
 
+      <div className="hero__meta wrap">
+        <a className="scroll-cue" href="#essencia" onClick={(e) => (e.preventDefault(), scrollToId('essencia'))}>
+          deslize <ArrowDown size={14} strokeWidth={1.4} />
+        </a>
         <ul className="hero__trust">
           <li>
             <ShieldCheck size={16} strokeWidth={1.4} /> biossegurança rigorosa
@@ -906,9 +942,37 @@ function Hero({ onBook }: { onBook: () => void }) {
         </ul>
       </div>
 
-      <a className="scroll-cue" href="#essencia" onClick={(e) => (e.preventDefault(), scrollToId('essencia'))}>
-        deslize <ArrowDown size={14} strokeWidth={1.4} />
-      </a>
+      {/* palavra gigante: a foto nítida aparece por dentro das letras */}
+      <div className="hero__word">
+        <h1 className="hero__title">
+          <span className="sr-only">nativa, beleza que respira</span>
+          <svg className="hero__svg" viewBox="0 0 1000 300" aria-hidden="true" focusable="false">
+            <defs>
+              <mask id="hero-word" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="340">
+                <text
+                  x="4"
+                  y="280"
+                  textLength={988}
+                  lengthAdjust="spacing"
+                  fill="#fff"
+                  stroke="#fff"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                  style={heroWordStyle}
+                >
+                  nativa
+                </text>
+              </mask>
+            </defs>
+            <g mask="url(#hero-word)">
+              <rect x="-20" y="-20" width="1040" height="340" fill="#8f8a7f" />
+              <g ref={shift}>
+                <image href={pexelsUrl(photos.hero, 1600)} x="-40" y="-170" width="1080" height="520" preserveAspectRatio="xMidYMid slice" />
+              </g>
+            </g>
+          </svg>
+        </h1>
+      </div>
     </section>
   );
 }
@@ -967,14 +1031,72 @@ function Essence({ onBook }: { onBook: () => void }) {
 // ==========================================================================
 
 
+/** Foto de cada categoria (placeholders: troque por fotos reais do espaço quando tiver). */
+const serviceMedia: Record<Category, number> = {
+  facial: photos.facial,
+  corporal: photos.ritual,
+  olhar: photos.hero,
+  depilacao: photos.bottle,
+};
+
 function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
   const [cat, setCat] = useState<Category>('facial');
-  const [open, setOpen] = useState<string | null>('ritual-de-presenca');
+  const [index, setIndex] = useState(0);
+  const track = useRef<HTMLUListElement>(null);
+  const drag = useRef({ x: 0, dx: 0, on: false, moved: false });
+
   const list = services.filter((s) => s.category === cat);
+  const last = list.length - 1;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const goTo = (n: number) => setIndex(clamp(n, 0, last));
 
   const choose = (c: Category) => {
     setCat(c);
-    setOpen(null);
+    setIndex(0);
+  };
+
+  // Arraste (mouse e toque): o trilho acompanha o dedo e, ao soltar, avança ou volta um serviço.
+  const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag.current = { x: e.clientX, dx: 0, on: true, moved: false };
+  };
+
+  const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d.on) return;
+    d.dx = e.clientX - d.x;
+    if (!d.moved && Math.abs(d.dx) > 6) {
+      d.moved = true;
+      track.current?.classList.add('is-dragging');
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    if (d.moved) track.current?.style.setProperty('--drag', `${d.dx * 0.5}px`);
+  };
+
+  const endDrag = () => {
+    const d = drag.current;
+    if (!d.on) return;
+    d.on = false;
+    track.current?.classList.remove('is-dragging');
+    track.current?.style.removeProperty('--drag');
+    if (d.moved) {
+      if (d.dx < -50) goTo(index + 1);
+      else if (d.dx > 50) goTo(index - 1);
+    }
+    // o clique que vem logo após soltar o arraste é ignorado
+    window.setTimeout(() => {
+      drag.current.moved = false;
+    }, 0);
+  };
+
+  const onKeyDown = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goTo(index + 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goTo(index - 1);
+    }
   };
 
   return (
@@ -990,7 +1112,7 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
               <em>sentir.</em>
             </>
           }
-          lead="Protocolos autorais para cada pele. Toque em um serviço para ver os detalhes e agendar."
+          lead="Protocolos autorais para cada pele. Arraste, use as setas ou toque nas laterais para ver o próximo."
         />
 
         <div className="tabs" role="tablist" aria-label="Categorias de serviço" data-reveal>
@@ -1008,61 +1130,104 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
           ))}
         </div>
 
-        <ul className="svc-list" role="tabpanel">
-          {list.map((s, i) => {
-            const isOpen = open === s.id;
-            return (
-              <li key={s.id} className={`svc${isOpen ? ' svc--open' : ''}`}>
-                <button
-                  type="button"
-                  className="svc__head"
-                  aria-expanded={isOpen}
-                  aria-controls={`svc-${s.id}`}
-                  onClick={() => setOpen(isOpen ? null : s.id)}
-                >
-                  <span className="svc__num">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="svc__title">
-                    <strong>{s.name}</strong>
-                    <small>
-                      <Clock size={13} strokeWidth={1.5} /> {s.minutes} min
-                    </small>
-                  </span>
-                  <span className="svc__price">{priceLabel(s.price)}</span>
-                  <span className="svc__icon" aria-hidden="true">
-                    <Plus size={18} strokeWidth={1.4} />
-                  </span>
-                </button>
+        <div
+          className="svc-rail"
+          role="group"
+          aria-roledescription="carrossel"
+          aria-label="Serviços"
+          tabIndex={0}
+          onKeyDown={onKeyDown}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          data-reveal
+        >
+          <ul className="svc-track" ref={track} style={{ '--i': index, '--n1': last } as CSSProperties}>
+            {list.map((s, i) => {
+              const on = i === index;
+              return (
+                <li key={s.id} className={`svc-card${on ? ' svc-card--on' : ''}`}>
+                  <div className="svc-card__inner">
+                    <div className="svc-card__media">
+                      <Photo id={serviceMedia[s.category]} alt="" sizes="(min-width: 1024px) 400px, 80vw" pos={`${(i * 37 + 15) % 100}% 40%`} />
+                    </div>
 
-                <Collapse open={isOpen} id={`svc-${s.id}`}>
-                  <div className="svc__body">
-                    <p>{s.desc}</p>
-                    <ul className="ticks">
-                      {s.benefits.map((b) => (
-                        <li key={b}>{b}</li>
-                      ))}
-                    </ul>
-                    <p className="svc__ideal">
-                      <span>ideal para</span> {s.ideal}
-                    </p>
-                    <div className="row">
-                      <button type="button" className="btn btn--primary" onClick={() => onBook(s.id)}>
-                        agendar este serviço <ArrowUpRight size={16} strokeWidth={1.6} />
-                      </button>
-                      <a
-                        className="btn btn--ghost"
-                        href={waLink(`Olá! Tenho uma dúvida sobre ${s.name}.`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <WhatsAppIcon size={16} /> tirar dúvida
-                      </a>
+                    {/* fatia recolhida: número, nome na vertical; clique abre o serviço */}
+                    <button
+                      type="button"
+                      className="svc-card__tab"
+                      aria-label={`Ver ${s.name}`}
+                      onClick={() => {
+                        if (!drag.current.moved) goTo(i);
+                      }}
+                    >
+                      <span className="svc-card__num">{pad(i + 1)}</span>
+                      <strong>{s.name}</strong>
+                      <Plus size={16} strokeWidth={1.4} />
+                    </button>
+
+                    <div className="svc-card__body" aria-hidden={!on}>
+                      <div className="svc-body__top">
+                        <span className="label">
+                          {pad(i + 1)} / {pad(list.length)}
+                        </span>
+                        <span className="label">{categories.find((c) => c.id === s.category)?.label}</span>
+                      </div>
+                      <h3 className="svc-body__title">{s.name}</h3>
+                      <p className="svc-body__meta">
+                        <span>
+                          <Clock size={13} strokeWidth={1.5} /> {s.minutes} min
+                        </span>
+                        <span className="svc-body__price">{priceLabel(s.price)}</span>
+                      </p>
+                      <p className="svc-body__desc">{s.desc}</p>
+                      <ul className="ticks">
+                        {s.benefits.map((b) => (
+                          <li key={b}>{b}</li>
+                        ))}
+                      </ul>
+                      <p className="svc-body__ideal">
+                        <span>ideal para</span> {s.ideal}
+                      </p>
+                      <div className="svc-body__cta">
+                        <button type="button" className="btn btn--primary" onClick={() => onBook(s.id)}>
+                          agendar este serviço <ArrowUpRight size={16} strokeWidth={1.6} />
+                        </button>
+                        <a
+                          className="btn btn--ghost svc-body__wa"
+                          href={waLink(`Olá! Tenho uma dúvida sobre ${s.name}.`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Tirar dúvida sobre ${s.name} no WhatsApp`}
+                        >
+                          <WhatsAppIcon size={16} /> <span>tirar dúvida</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
-                </Collapse>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="svc-ctrl" data-reveal>
+          <p className="label" aria-live="polite">
+            {pad(index + 1)} / {pad(list.length)}
+          </p>
+          <div className="svc-ctrl__bar" aria-hidden="true">
+            <i style={{ transform: `scaleX(${(index + 1) / list.length})` }} />
+          </div>
+          <div className="svc-ctrl__btns">
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index - 1)} disabled={index === 0} aria-label="Serviço anterior">
+              <ArrowLeft size={18} strokeWidth={1.5} />
+            </button>
+            <button type="button" className="btn btn--ghost svc-arrow" onClick={() => goTo(index + 1)} disabled={index === last} aria-label="Próximo serviço">
+              <ArrowRight size={18} strokeWidth={1.5} />
+            </button>
+          </div>
+        </div>
 
         <p className="services__foot" data-reveal>
           Não sabe por onde começar?{' '}
@@ -1074,7 +1239,6 @@ function Services({ onBook }: { onBook: (serviceId?: string) => void }) {
     </section>
   );
 }
-
 
 // ==========================================================================
 // MAPA DA PELE (3D)
@@ -1684,6 +1848,179 @@ interface BookingPreset {
 
 const steps = ['serviço', 'data e hora', 'sobre você', 'revisar'];
 
+// ——— calendário em vidro: semana (dias em arco) ou mês ———
+
+const monthLongFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', month: 'long' });
+const weekdayLongFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC', weekday: 'long' });
+const isoDate = (iso: string) => new Date(`${iso}T12:00:00Z`);
+const monthDows = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+interface CalendarProps {
+  days: DayInfo[];
+  selected: string | null;
+  isOff: (d: DayInfo) => boolean;
+  onPick: (iso: string) => void;
+  caption: string;
+}
+
+function BookingCalendar({ days, selected, isOff, onPick, caption }: CalendarProps) {
+  const [view, setView] = useState<'semana' | 'mes'>('semana');
+  const [month, setMonth] = useState(() => (selected ?? days[0].iso).slice(0, 7));
+  const drag = useRef({ x: 0, on: false, moved: false });
+
+  const firstFree = days.find((d) => !isOff(d)) ?? days[0];
+  const focusIso = selected ?? firstFree.iso;
+  const focusIdx = Math.max(0, days.findIndex((d) => d.iso === focusIso));
+  const months = Array.from(new Set(days.map((d) => d.iso.slice(0, 7))));
+  const monthIdx = months.indexOf(month);
+  const shownMonth = view === 'mes' ? month : focusIso.slice(0, 7);
+
+  const pick = (iso: string) => {
+    onPick(iso);
+    setMonth(iso.slice(0, 7));
+  };
+
+  // próximo dia livre na direção escolhida (arraste, setas do teclado)
+  const move = (dir: 1 | -1) => {
+    for (let i = focusIdx + dir; i >= 0 && i < days.length; i += dir) {
+      if (!isOff(days[i])) {
+        pick(days[i].iso);
+        return;
+      }
+    }
+  };
+
+  const onDown = (e: RPointerEvent<HTMLDivElement>) => {
+    drag.current = { x: e.clientX, on: true, moved: false };
+  };
+  const onUp = (e: RPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d.on) return;
+    d.on = false;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 40) {
+      d.moved = true;
+      move(dx < 0 ? 1 : -1);
+      window.setTimeout(() => {
+        drag.current.moved = false;
+      }, 0);
+    }
+  };
+  const onKey = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      move(1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      move(-1);
+    }
+  };
+
+  // grade do mês
+  const [yy, mm] = month.split('-').map(Number);
+  const lead = new Date(Date.UTC(yy, mm - 1, 1, 12)).getUTCDay();
+  const dim = new Date(Date.UTC(yy, mm, 0, 12)).getUTCDate();
+  const cells: (number | null)[] = [...Array.from({ length: lead }, () => null), ...Array.from({ length: dim }, (_, i) => i + 1)];
+
+  return (
+    <div className="cal">
+      <div className="cal__top">
+        <div className="cal__seg" role="tablist" aria-label="Visualização do calendário">
+          {(['semana', 'mes'] as const).map((v) => (
+            <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)}>
+              {v === 'mes' ? 'mês' : 'semana'}
+            </button>
+          ))}
+        </div>
+        <div className="cal__tools">
+          {view === 'semana' ? (
+            <button type="button" className="cal__round" aria-label="Voltar ao primeiro dia disponível" onClick={() => pick(firstFree.iso)}>
+              {days[0].isToday ? 'hoje' : 'início'}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="cal__round" aria-label="Mês anterior" disabled={monthIdx <= 0} onClick={() => setMonth(months[monthIdx - 1])}>
+                <ArrowLeft size={16} strokeWidth={1.6} />
+              </button>
+              <button type="button" className="cal__round" aria-label="Próximo mês" disabled={monthIdx >= months.length - 1} onClick={() => setMonth(months[monthIdx + 1])}>
+                <ArrowRight size={16} strokeWidth={1.6} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <h4 className="cal__title" aria-live="polite">
+        <span>{monthLongFmt.format(isoDate(`${shownMonth}-01`))}</span>
+        <span>{days[focusIdx].dayNum}</span>
+      </h4>
+      <p className="cal__sub">
+        {weekdayLongFmt.format(isoDate(focusIso))}
+        {caption ? ` · ${caption}` : ''}
+      </p>
+
+      {view === 'semana' ? (
+        <div className="cal__week" role="radiogroup" aria-label="Dia" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => (drag.current.on = false)} onKeyDown={onKey}>
+          <svg className="cal__arc" viewBox="0 0 400 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+            <path d="M0 70 Q200 -5 400 70 L400 100 Q200 25 0 100 Z" vectorEffect="non-scaling-stroke" />
+          </svg>
+          {days.map((d, i) => {
+            const off = i - focusIdx;
+            const on = selected === d.iso;
+            return (
+              <button
+                key={d.iso}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                disabled={isOff(d)}
+                tabIndex={off === 0 ? 0 : -1}
+                className={`cal__day${on ? ' is-on' : ''}${Math.abs(off) > 3 ? ' is-far' : ''}`}
+                style={{ '--o': off, '--a': Math.abs(off) } as CSSProperties}
+                onClick={() => {
+                  if (!drag.current.moved) pick(d.iso);
+                }}
+              >
+                <small>{d.isToday ? 'hoje' : d.weekday}</small>
+                <b>{d.dayNum}</b>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="cal__month">
+          <div className="cal__dows" aria-hidden="true">
+            {monthDows.map((d) => (
+              <span key={d}>{d}</span>
+            ))}
+          </div>
+          <div className="cal__grid" role="radiogroup" aria-label="Dia">
+            {cells.map((n, i) => {
+              if (n === null) return <span key={`b${i}`} />;
+              const iso = `${month}-${String(n).padStart(2, '0')}`;
+              const info = days.find((x) => x.iso === iso);
+              const on = selected === iso;
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  disabled={!info || isOff(info)}
+                  className={`cal__cell${on ? ' is-on' : ''}${info?.isToday ? ' is-today' : ''}`}
+                  onClick={() => pick(iso)}
+                >
+                  {n}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Booking({ preset }: { preset: BookingPreset }) {
   const [step, setStep] = useState(0);
   const [cat, setCat] = useState<Category>('facial');
@@ -1736,6 +2073,13 @@ function Booking({ preset }: { preset: BookingPreset }) {
     }
   }, [step]);
 
+  // Etapa de data: o primeiro dia livre já vem selecionado (os horários aparecem de imediato).
+  useEffect(() => {
+    if (step !== 1 || !service || dayIso) return;
+    const firstFree = days.find((d) => slotsFor(d, service.minutes).length > 0);
+    if (firstFree) setDayIso(firstFree.iso);
+  }, [step, service, dayIso, days]);
+
   const pickService = (id: string) => {
     setServiceId(id);
     setDayIso(null);
@@ -1760,6 +2104,11 @@ function Booking({ preset }: { preset: BookingPreset }) {
 
   return (
     <section className="booking section section--ink" id="agendar">
+      <div className="liquid" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
       <div className="wrap">
         <SectionHead
           index="04"
@@ -1821,30 +2170,17 @@ function Booking({ preset }: { preset: BookingPreset }) {
                 {service.name} · {service.minutes} min
               </p>
 
-              <div className="days" role="radiogroup" aria-label="Dia">
-                {days.map((d) => {
-                  const disabled = slotsFor(d, service.minutes).length === 0;
-                  return (
-                    <button
-                      key={d.iso}
-                      type="button"
-                      role="radio"
-                      aria-checked={dayIso === d.iso}
-                      disabled={disabled}
-                      className={`day${dayIso === d.iso ? ' day--on' : ''}`}
-                      onClick={() => {
-                        setDayIso(d.iso);
-                        setTime(null);
-                        reveal(slotsRef.current);
-                      }}
-                    >
-                      <small>{d.isToday ? 'hoje' : d.weekday}</small>
-                      <strong>{d.dayNum}</strong>
-                      <small>{d.month}</small>
-                    </button>
-                  );
-                })}
-              </div>
+              <BookingCalendar
+                days={days}
+                selected={dayIso}
+                isOff={(d) => slotsFor(d, service.minutes).length === 0}
+                onPick={(iso) => {
+                  setDayIso(iso);
+                  setTime(null);
+                  reveal(slotsRef.current);
+                }}
+                caption={day ? `${slots.length} ${slots.length === 1 ? 'horário livre' : 'horários livres'}` : ''}
+              />
 
               <div ref={slotsRef} />
               {day ? (
@@ -2074,48 +2410,75 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
   );
 }
 
-function Packages() {
-  return (
-    <section className="packages section" id="pacotes">
-      <div className="wrap">
-        <SectionHead
-          index="07"
-          label="pacotes"
-          title={
-            <>
-              cuidado com
-              <br />
-              <em>constância.</em>
-            </>
-          }
-          lead="A pele responde ao hábito. Escolha o ritmo que cabe na sua rotina."
-        />
+/** Filtro SVG do vidro canelado: cada estria de 12px desloca o que está atrás, como um vidro de verdade. */
+const fluteMap =
+  "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23008080'/%3E%3Cstop offset='1' stop-color='%23ff8080'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='12' height='8' fill='url(%23g)'/%3E%3C/svg%3E";
 
-        <div className="pk-grid">
-          {packages.map((p) => (
-            <article key={p.id} className={`pk${p.featured ? ' pk--featured' : ''}`} data-reveal>
-              <p className="pk__tag">{p.tag}</p>
-              <h3 className="pk__name">{p.name}</h3>
-              <p className="pk__price">
-                {brl(p.price)}
-                {p.per ? <small>{p.per}</small> : null}
-              </p>
-              {p.note ? <p className="pk__note">{p.note}</p> : <p className="pk__note">&nbsp;</p>}
-              <ul className="ticks">
-                {p.items.map((i) => (
-                  <li key={i}>{i}</li>
-                ))}
-              </ul>
-              <a
-                className={`btn btn--block ${p.featured ? 'btn--light' : 'btn--primary'}`}
-                href={waLink(`Olá! Tenho interesse no pacote "${p.name}". Podem me explicar como funciona?`)}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                quero este <ArrowUpRight size={16} strokeWidth={1.6} />
-              </a>
-            </article>
-          ))}
+function Packages() {
+  // O refrator do vidro canelado (filtro SVG aplicado ao fundo) só existe em navegadores Chromium.
+  // Nos demais (Safari, Firefox) ficam as estrias e o desfoque, sem distorcer a palavra.
+  const [flute, setFlute] = useState(false);
+  useEffect(() => {
+    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands;
+    setFlute(!!brands?.some((b) => b.brand === 'Chromium'));
+  }, []);
+
+  return (
+    <section className="packages section section--ink" id="pacotes" data-flute={flute ? 'on' : undefined}>
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true" focusable="false">
+        <filter id="pk-flute" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+          <feImage href={fluteMap} x="0" y="0" width="12" height="8" result="tile" />
+          <feTile in="tile" result="map" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
+      <div className="wrap">
+        <header className="pk-head" data-reveal>
+          <p className="label label--light">07 / pacotes</p>
+          <p className="lead">A pele responde ao hábito. Escolha o ritmo que cabe na sua rotina.</p>
+        </header>
+        <h2 className="sr-only">preços e pacotes</h2>
+
+        <div className="pk-stage">
+          {/* a palavra fica atrás dos cartões: as estrias do vidro a distorcem */}
+          <svg className="pk-word" viewBox="0 0 1000 245" aria-hidden="true" focusable="false">
+            <text x="4" y="172" textLength={988} lengthAdjust="spacing" style={{ fontFamily: 'var(--serif)', fontSize: 300 }}>
+              preços
+            </text>
+          </svg>
+
+          <div className="pk-grid">
+            {packages.map((p) => (
+              <article key={p.id} className={`pk${p.featured ? ' pk--featured' : ''}`} data-reveal>
+                <p className="pk__tag">{p.tag}</p>
+                <h3 className="pk__name">{p.name}</h3>
+                <p className="pk__price">
+                  {brl(p.price)}
+                  {p.per ? <small>{p.per}</small> : null}
+                </p>
+                <p className="pk__note">{p.note ?? ' '}</p>
+                <ul className="pk__list">
+                  {p.items.map((i) => (
+                    <li key={i}>
+                      <span className="pk__chk" aria-hidden="true">
+                        <Check size={11} strokeWidth={2.6} />
+                      </span>
+                      {i}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  className={`btn btn--block ${p.featured ? 'btn--light' : 'btn--ghost-light'}`}
+                  href={waLink(`Olá! Tenho interesse no pacote "${p.name}". Podem me explicar como funciona?`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  quero este <ArrowUpRight size={16} strokeWidth={1.6} />
+                </a>
+              </article>
+            ))}
+          </div>
         </div>
 
         <div className="gift" data-reveal>
@@ -2124,7 +2487,7 @@ function Packages() {
             <h3>vale-presente</h3>
             <p>Dê um momento de cuidado a quem você ama. Valor livre ou um ritual específico.</p>
           </div>
-          <a className="btn btn--ghost" href={waLink('Olá! Gostaria de presentear com um vale-presente.')} target="_blank" rel="noopener noreferrer">
+          <a className="btn btn--ghost-light" href={waLink('Olá! Gostaria de presentear com um vale-presente.')} target="_blank" rel="noopener noreferrer">
             <WhatsAppIcon size={16} /> presentear
           </a>
         </div>
