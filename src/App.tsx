@@ -875,63 +875,6 @@ function Hero() {
   // acompanha o scroll (vertical) e o mouse (horizontal), como se as letras fossem uma janela.
   // A palavra do hero acompanha o movimento e se encaixa na marca do cabeçalho.
   useEffect(() => {
-    const source = word.current;
-    const brand = document.querySelector<HTMLElement>('.nav .brand');
-    if (!source || !brand || prefersReducedMotion()) return;
-
-    const clone = source.cloneNode(true) as SVGSVGElement;
-    clone.removeAttribute('class');
-    Object.assign(clone.style, {
-      animation: 'none',
-      display: 'block',
-      left: '0',
-      maxWidth: 'none',
-      opacity: '0',
-      pointerEvents: 'none',
-      position: 'fixed',
-      top: '0',
-      transformOrigin: 'top left',
-      width: '0px',
-      zIndex: '60',
-    });
-    document.body.appendChild(clone);
-
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const from = source.getBoundingClientRect();
-      const to = brand.getBoundingClientRect();
-      const start = window.innerHeight * 0.62;
-      const end = Math.max(8, to.top + to.height / 2);
-      const progress = Math.max(0, Math.min(1, (start - from.top) / Math.max(1, start - end)));
-      const scale = to.width / Math.max(1, from.width);
-      clone.style.left = `${from.left}px`;
-      clone.style.top = `${from.top}px`;
-      clone.style.width = `${from.width}px`;
-      clone.style.opacity = String(progress < 0.85 ? 1 : (1 - progress) / 0.15);
-      clone.style.transform = `translate3d(${(to.left - from.left) * progress}px, ${(to.top - from.top) * progress}px, 0) scale(${1 + (scale - 1) * progress})`;
-      source.style.opacity = '0';
-      brand.style.opacity = String(progress <= 0.5 ? 1 - progress * 2 : (progress - 0.5) * 2);
-      brand.style.transition = 'opacity 0.08s linear';
-    };
-    const queue = () => {
-      if (!raf) raf = requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener('scroll', queue, { passive: true });
-    window.addEventListener('resize', queue);
-    return () => {
-      window.removeEventListener('scroll', queue);
-      window.removeEventListener('resize', queue);
-      cancelAnimationFrame(raf);
-      source.style.opacity = '';
-      brand.style.opacity = '';
-      brand.style.transition = '';
-      clone.remove();
-    };
-  }, []);
-
-  useEffect(() => {
     if (prefersReducedMotion()) return;
     const fine = window.matchMedia('(pointer: fine)').matches;
     let raf = 0;
@@ -2530,9 +2473,9 @@ const fluteMap =
   "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23008080'/%3E%3Cstop offset='1' stop-color='%23ff8080'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='12' height='8' fill='url(%23g)'/%3E%3C/svg%3E";
 
 function Packages() {
-  // O refrator do vidro canelado (filtro SVG aplicado ao fundo) só existe em navegadores Chromium.
-  // Nos demais (Safari, Firefox) ficam as estrias e o desfoque, sem distorcer a palavra.
-  const [flute, setFlute] = useState(false);
+  // Mantém o filtro SVG de refração ativo também no mobile.
+  // Navegadores sem suporte ao backdrop-filter SVG usam o fallback de estrias abaixo.
+  const flute = true;
   const [activePackage, setActivePackage] = useState(0);
   const packageRail = useRef<HTMLDivElement>(null);
 
@@ -2551,11 +2494,6 @@ function Packages() {
     const gap = Number.parseFloat(getComputedStyle(rail).columnGap) || 0;
     setActivePackage(Math.max(0, Math.min(packages.length - 1, Math.round(rail.scrollLeft / (firstCard.offsetWidth + gap)))));
   };
-
-  useEffect(() => {
-    const brands = (navigator as Navigator & { userAgentData?: { brands: { brand: string }[] } }).userAgentData?.brands;
-    setFlute(!!brands?.some((b) => b.brand === 'Chromium'));
-  }, []);
 
   return (
     <section className="packages section section--ink" id="pacotes" data-flute={flute ? 'on' : undefined}>

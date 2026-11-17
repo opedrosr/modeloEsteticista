@@ -624,7 +624,7 @@ img {
   flex-direction: column;
   isolation: isolate;
   min-height: 680px;
-  min-height: min(100svh, 940px);
+  min-height: min(88svh, 820px);
   overflow: hidden;
   position: relative;
 }
@@ -692,8 +692,8 @@ img {
 
 .hero__cta {
   display: block;
-  height: 104px;
-  margin-top: 26px;
+  height: 24px;
+  margin-top: 12px;
   max-width: 420px;
 }
 
@@ -704,7 +704,7 @@ img {
   justify-content: space-between;
   margin-top: auto;
   padding-bottom: 14px;
-  padding-top: 40px;
+  padding-top: 24px;
   position: relative;
   width: 100%;
 }
@@ -1972,23 +1972,12 @@ img {
   .pk-grid::-webkit-scrollbar { display: none; }
 
   .pk-grid > .pk {
-    /* No mobile, evita o blur forte que deixa o vidro leitoso.
-       O filtro de refração SVG definido em [data-flute] continua ativo. */
-    -webkit-backdrop-filter: blur(1px) brightness(1.12);
-    backdrop-filter: blur(1px) brightness(1.12);
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 48%, rgba(0, 0, 0, 0.08) 100%);
+    /* Mesmo filtro de refração canelada do desktop, também no carrossel mobile. */
+    -webkit-backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
+    backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
     flex: 0 0 88%;
     min-width: 0;
     scroll-snap-align: center;
-  }
-
-  .pk-grid > .pk::before {
-    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.24) 0, rgba(255, 255, 255, 0.08) 2px, rgba(255, 255, 255, 0) 6px, rgba(0, 0, 0, 0.2) 12px);
-  }
-
-  .pk-grid > .pk.pk--featured {
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(0, 0, 0, 0.1) 100%);
-    border-color: rgba(255, 255, 255, 0.34);
   }
 
   .pk-dots {
@@ -2450,7 +2439,7 @@ img {
   .svc-body__wa span { display: inline; }
   .svc-body__wa { padding: 0 22px; }
 
-  .hero__cta { height: 52px; max-width: none; }
+  .hero__cta { height: 24px; max-width: none; }
   .scroll-cue { display: flex; }
   .hero__body { padding-top: calc(var(--nav-h) + 64px); }
 
