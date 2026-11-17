@@ -3039,7 +3039,6 @@ export default function App() {
         <Services onBook={book} />
         <FaceMap onBook={book} />
         <Booking preset={preset} />
-        <Journey onBook={() => book('avaliacao-de-pele')} />
         <BeforeAfter onBook={() => book()} />
         <Packages />
         <Gallery />
