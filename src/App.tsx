@@ -529,8 +529,13 @@ const marquee = [
   'design de sobrancelhas',
 ];
 
-const beforeAfter = {
-  /** PLACEHOLDER — troque por fotos reais (com autorização/termo de uso de imagem). */
+/**
+ * ANTES/DEPOIS — troque as duas fotos (PLACEHOLDER) por fotos reais, com autorização/termo de uso de imagem.
+ * Cada foto aceita o id de uma foto do Pexels (número) ou o caminho de uma foto sua (texto), ex.: '/antes.jpg'.
+ * Qualquer tamanho serve: a foto entra INTEIRA na moldura (nunca é cortada); o espaço que sobrar é preenchido com a própria foto desfocada.
+ * Com illustrative: true, o "antes" recebe um tratamento só para ilustrar e aparece o aviso "imagem ilustrativa".
+ */
+const beforeAfter: { before: number | string; after: number | string; illustrative: boolean } = {
   before: photos.hero,
   after: photos.hero,
   illustrative: true,
@@ -699,30 +704,35 @@ function WhatsAppIcon({ size = 18 }: { size?: number }) {
 
 const pexelsUrl = (id: number, w: number) => `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=${w}`;
 
+/** Aceita id do Pexels (número) ou uma foto sua (texto: caminho ou URL, ex.: '/antes.jpg'). */
+const photoSrc = (id: number | string, w: number) => (typeof id === 'string' ? id : pexelsUrl(id, w));
+
 interface PhotoProps {
-  id: number;
+  id: number | string;
   alt: string;
   sizes?: string;
   priority?: boolean;
   className?: string;
   pos?: string;
   style?: CSSProperties;
+  onLoad?: (img: HTMLImageElement) => void;
 }
 
 /** Imagem responsiva com fallback elegante: se não carregar, o fundo do bloco aparece. */
-function Photo({ id, alt, sizes = '100vw', priority, className = '', pos, style }: PhotoProps) {
+function Photo({ id, alt, sizes = '100vw', priority, className = '', pos, style, onLoad }: PhotoProps) {
   const [failed, setFailed] = useState(false);
   return (
     <img
       className={`photo${failed ? ' photo--failed' : ''} ${className}`.trim()}
-      src={pexelsUrl(id, 960)}
-      srcSet={`${pexelsUrl(id, 480)} 480w, ${pexelsUrl(id, 960)} 960w, ${pexelsUrl(id, 1600)} 1600w`}
+      src={photoSrc(id, 960)}
+      srcSet={typeof id === 'number' ? `${pexelsUrl(id, 480)} 480w, ${pexelsUrl(id, 960)} 960w, ${pexelsUrl(id, 1600)} 1600w` : undefined}
       sizes={sizes}
       alt={failed ? '' : alt}
       loading={priority ? 'eager' : 'lazy'}
       decoding="async"
       {...(priority ? ({ fetchpriority: 'high' } as Record<string, string>) : {})}
       onError={() => setFailed(true)}
+      onLoad={(e) => onLoad?.(e.currentTarget)}
       style={{ objectPosition: pos, ...style }}
     />
   );
@@ -2440,50 +2450,189 @@ function Journey({ onBook }: { onBook: () => void }) {
   );
 }
 
+/** Foto que aparece por dentro das letras (preto e branco). Troque aqui, se quiser outra. */
+const baLetterPhoto: number | string = photos.philosophy;
+
+/** Três linhas empilhadas, cada uma esticada de ponta a ponta (textLength): letras enormes, coladas, estilo cartaz. */
+const baLines = [
+  { text: 'uma', y: 232, size: 400 },
+  { text: 'pele', y: 561, size: 420 },
+  { text: 'cuidada', y: 832, size: 228 },
+];
+const baPhrase = ['não', 'precisa', 'dizer', 'nada.'];
+
+/**
+ * Antes e depois em scrollytelling: a seção fica fixa na tela e a rolagem comanda tudo.
+ *  1. letras enormes com a foto em preto e branco por dentro (nítida, como na hero); a foto desliza e as
+ *     linhas se afastam, enquanto a frase acende palavra por palavra;
+ *  2. a escrita sobe e some, e a moldura do comparador abre no lugar;
+ *  3. o comparador corre do "antes" para o "depois". No fim, dá para arrastar à mão.
+ * As variáveis --a, --x, --c e --pos são escritas direto no DOM (sem re-render do React).
+ */
 function BeforeAfter({ onBook }: { onBook: () => void }) {
-  const [pos, setPos] = useState(50);
+  const root = useRef<HTMLElement>(null);
+  const range = useRef<HTMLInputElement>(null);
+  const imgG = useRef<SVGGElement>(null);
+  const lineRefs = useRef<(SVGTextElement | null)[]>([]);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const setPos = (v: number) => {
+      el.style.setProperty('--pos', `${v.toFixed(2)}%`);
+      if (range.current) range.current.value = String(Math.round(v));
+    };
+    if (prefersReducedMotion()) {
+      setPos(50);
+      return;
+    }
+    let raf = 0;
+    let lastC = -1;
+    const tick = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      const r = el.getBoundingClientRect();
+      const p = clamp(-r.top / Math.max(1, r.height - vh), 0, 1);
+      const a = clamp(p / 0.36, 0, 1); // escrita
+      const x = sstep(0, 1, clamp((p - 0.34) / 0.2, 0, 1)); // troca: escrita sai, comparador entra
+      const c = clamp((p - 0.54) / 0.4, 0, 1); // comparador corre
+      el.style.setProperty('--a', a.toFixed(4));
+      el.style.setProperty('--x', x.toFixed(4));
+      el.style.setProperty('--c', c.toFixed(4));
+      if (x > 0.6) el.setAttribute('data-live', '');
+      else el.removeAttribute('data-live');
+      if (c > 0.6) el.setAttribute('data-done', '');
+      else el.removeAttribute('data-done');
+
+      // dentro das letras: a foto desliza e cresce; as linhas se afastam, uma para cada lado
+      const s = 1 + a * 0.1;
+      imgG.current?.setAttribute('transform', `translate(500 420) scale(${s.toFixed(4)}) translate(${((0.5 - a) * 50 - 500).toFixed(1)} ${((0.5 - a) * 90 - 420).toFixed(1)})`);
+      lineRefs.current.forEach((t, i) => t?.setAttribute('transform', `translate(${((0.5 - a) * 34 * (i % 2 ? -1 : 1)).toFixed(1)} 0)`));
+
+      // só mexe no comparador enquanto a rolagem o move: depois disso a pessoa pode arrastar
+      if (c !== lastC) {
+        lastC = c;
+        setPos(92 - 84 * sstep(0, 1, c));
+      }
+    };
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    tick();
+    window.addEventListener('scroll', queue, { passive: true });
+    window.addEventListener('resize', queue);
+    return () => {
+      window.removeEventListener('scroll', queue);
+      window.removeEventListener('resize', queue);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   return (
-    <section className="ba section section--mist" id="resultados">
-      <div className="wrap ba__grid">
-        <div className="ba__copy" data-reveal>
-          <p className="label">06 / resultados</p>
-          <h2 className="h2">
-            uma pele cuidada
-            <br />
-            <em>não precisa dizer nada.</em>
-          </h2>
-          <p className="body">Arraste para comparar. Cada resultado varia conforme a pele, o plano e a constância dos cuidados.</p>
-          <button type="button" className="btn btn--primary" onClick={onBook}>
-            quero o meu plano <ArrowUpRight size={16} strokeWidth={1.6} />
-          </button>
+    <section className="ba" id="resultados" ref={root} data-demo={beforeAfter.illustrative ? '' : undefined}>
+      <div className="ba__pin">
+        {/* 1 — letras brutas com a foto em preto e branco por dentro */}
+        <div className="ba__intro">
+          <div className="ba__col ba__col--intro">
+            <p className="label ba__label">06 / resultados</p>
+            <h2 className="ba__title">
+              <span className="sr-only">uma pele cuidada não precisa dizer nada</span>
+              <svg className="ba__svg" viewBox="0 0 1000 840" aria-hidden="true" focusable="false">
+                <defs>
+                  <filter id="ba-soft" x="-5%" y="-5%" width="110%" height="110%">
+                    <feGaussianBlur stdDeviation="8" />
+                  </filter>
+                  <mask id="ba-word" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="880">
+                    {baLines.map((l, i) => (
+                      <text
+                        key={l.text}
+                        ref={(n) => {
+                          lineRefs.current[i] = n;
+                        }}
+                        x="20"
+                        y={l.y}
+                        textLength={960}
+                        lengthAdjust="spacingAndGlyphs"
+                        fill="#fff"
+                        stroke="#fff"
+                        strokeWidth="3"
+                        strokeLinejoin="round"
+                        style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: l.size }}
+                      >
+                        {l.text}
+                      </text>
+                    ))}
+                  </mask>
+                </defs>
+                <g mask="url(#ba-word)">
+                  <rect x="-20" y="-20" width="1040" height="880" fill="#6f6c66" />
+                  <g ref={imgG}>
+                    <image href={photoSrc(baLetterPhoto, 1600)} filter="url(#ba-soft)" x="-60" y="-100" width="1120" height="1040" preserveAspectRatio="xMidYMid slice" />
+                  </g>
+                </g>
+              </svg>
+            </h2>
+            <div className="ba__copy" aria-hidden="true">
+              <p className="ba__lead">
+                {baPhrase.map((w, i) => (
+                  <span key={w} className="w" style={{ '--i': i } as CSSProperties}>
+                    {w}{' '}
+                  </span>
+                ))}
+              </p>
+              <p className="ba__cue">
+                role para ver <ArrowDown size={14} strokeWidth={1.4} />
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="ba__stage" data-reveal>
-          <div className="ba__slider" style={{ '--pos': `${pos}%` } as CSSProperties}>
-            <Photo id={beforeAfter.after} alt="Pele depois do protocolo" className="ba__img" sizes="(min-width: 900px) 55vw, 100vw" />
-            <Photo id={beforeAfter.before} alt="Pele antes do protocolo" className="ba__img ba__img--before" sizes="(min-width: 900px) 55vw, 100vw" />
-            <span className="ba__tag ba__tag--l">antes</span>
-            <span className="ba__tag ba__tag--r">depois</span>
-            <div className="ba__handle" aria-hidden="true">
-              <i />
-              <b>
-                <ChevronsLeftRight size={18} strokeWidth={1.4} />
-              </b>
-              <i />
+        {/* 2 e 3 — a moldura abre e o comparador corre do antes para o depois */}
+        <div className="ba__reveal">
+          <div className="ba__col">
+            <div className="ba__stack">
+              <p className="ba__sub">
+                Arraste para comparar.<span className="ba__sub-more"> Cada resultado varia conforme a pele, o plano e a constância dos cuidados.</span>
+              </p>
+              <div className="ba__slider">
+                {/* cada lado: fundo desfocado da própria foto + a foto inteira, sem corte */}
+                <div className="ba__side ba__side--after">
+                  <Photo id={beforeAfter.after} alt="" className="ba__fill" sizes="30vw" />
+                  <Photo id={beforeAfter.after} alt="Pele depois do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
+                </div>
+                <div className="ba__side ba__side--before">
+                  <Photo id={beforeAfter.before} alt="" className="ba__fill" sizes="30vw" />
+                  <Photo id={beforeAfter.before} alt="Pele antes do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
+                </div>
+                <span className="ba__tag ba__tag--l">antes</span>
+                <span className="ba__tag ba__tag--r">depois</span>
+                {beforeAfter.illustrative ? <span className="ba__note">imagem ilustrativa</span> : null}
+                <div className="ba__handle" aria-hidden="true">
+                  <i />
+                  <b>
+                    <ChevronsLeftRight size={18} strokeWidth={1.4} />
+                  </b>
+                  <i />
+                </div>
+                <input
+                  ref={range}
+                  className="ba__range"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  defaultValue={92}
+                  onChange={(e) => root.current?.style.setProperty('--pos', `${e.currentTarget.value}%`)}
+                  aria-label="Comparar antes e depois"
+                />
+              </div>
+              <div className="ba__foot">
+                <button type="button" className="btn btn--primary btn--block" onClick={onBook}>
+                  quero o meu plano <ArrowUpRight size={16} strokeWidth={1.6} />
+                </button>
+              </div>
             </div>
-            <input
-              className="ba__range"
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={pos}
-              onChange={(e) => setPos(Number(e.target.value))}
-              aria-label="Comparar antes e depois"
-            />
           </div>
-          {beforeAfter.illustrative ? <p className="ba__note">imagem ilustrativa</p> : null}
         </div>
       </div>
     </section>
