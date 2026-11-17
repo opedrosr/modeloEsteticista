@@ -1972,12 +1972,18 @@ img {
   .pk-grid::-webkit-scrollbar { display: none; }
 
   .pk-grid > .pk {
-    -webkit-backdrop-filter: blur(18px) saturate(1.9) brightness(1.12);
-    backdrop-filter: blur(18px) saturate(1.9) brightness(1.12);
-    background: linear-gradient(145deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.035) 48%, rgba(0, 0, 0, 0.12) 100%);
+    /* No mobile, evita o blur forte que deixa o vidro leitoso.
+       O filtro de refração SVG definido em [data-flute] continua ativo. */
+    -webkit-backdrop-filter: blur(1px) brightness(1.12);
+    backdrop-filter: blur(1px) brightness(1.12);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 48%, rgba(0, 0, 0, 0.08) 100%);
     flex: 0 0 88%;
     min-width: 0;
     scroll-snap-align: center;
+  }
+
+  .pk-grid > .pk::before {
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.24) 0, rgba(255, 255, 255, 0.08) 2px, rgba(255, 255, 255, 0) 6px, rgba(0, 0, 0, 0.2) 12px);
   }
 
   .pk-grid > .pk.pk--featured {
