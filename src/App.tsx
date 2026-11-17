@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  Camera,
   Check,
   ChevronsLeftRight,
   Clock,
@@ -16,6 +17,7 @@ import {
   Mail,
   MapPin,
   Menu,
+  Play,
   Plus,
   Quote,
   ShieldCheck,
@@ -2646,47 +2648,160 @@ function Care() {
   );
 }
 
+/** Vídeo institucional da clínica (arquivo .mp4 em /public ou endereço completo). Vazio = o botão de play mostra um aviso. */
+const aboutVideo = '';
+
+/** Textos do "Sobre". O parágrafo e as listas são contados em palavras para a rolagem acendê-los na ordem. */
+const aboutParagraphs = [
+  'A Nativa nasceu da vontade de fazer estética sem pressa e sem promessas milagrosas: avaliação honesta, protocolos pensados para cada pele e um ambiente onde dá para respirar.',
+  'Cada atendimento começa por uma conversa e uma avaliação da pele. Só então indicamos o protocolo, com o que esperar de cada sessão e quanto tempo o cuidado leva.',
+];
+const aboutBlocks: { title: string; items: string[] }[] = [
+  { title: 'formação', items: credentials },
+  { title: 'biossegurança', items: biosafety },
+];
+const aboutWords = (s: string) => s.split(' ').length;
+const aboutCount =
+  aboutParagraphs.reduce((n, p) => n + aboutWords(p), 0) +
+  aboutBlocks.reduce((n, b) => n + aboutWords(b.title) + b.items.reduce((m, i) => m + aboutWords(i), 0), 0);
+
+/**
+ * Sobre: abertura escura com título gigante sobre a foto desfocada, faixa panorâmica nítida,
+ * e abaixo "rótulo + play" à esquerda e texto à direita. Rolagem scrub: a foto abre e as palavras acendem.
+ */
 function About({ onBook }: { onBook: () => void }) {
+  const root = useRef<HTMLElement>(null);
+  const top = useRef<HTMLDivElement>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const clamp = (n: number) => Math.min(1, Math.max(0, n));
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.style.setProperty('--p', '1');
+      el.style.setProperty('--q', '1');
+      return;
+    }
+    let raf = 0;
+    const tick = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      const s = top.current?.getBoundingClientRect();
+      const c = copyRef.current?.getBoundingClientRect();
+      if (!s || !c) return;
+      // abertura: a faixa panorâmica "abre" e a foto de fundo ganha nitidez enquanto o topo sobe pela tela
+      el.style.setProperty('--q', clamp((vh * 0.9 - s.top) / (vh * 0.8)).toFixed(4));
+      // texto: as palavras acendem na ordem
+      el.style.setProperty('--p', clamp((vh * 0.85 - c.top) / Math.max(1, c.height - vh * 0.1)).toFixed(4));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    tick();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  let n = 0;
+  const words = (s: string) =>
+    s.split(' ').map((w, i) => (
+      <span key={i} className="w" style={{ '--i': n++ } as CSSProperties}>
+        {w}{' '}
+      </span>
+    ));
+
+  const openVideo = () => dialog.current?.showModal();
+  const closeVideo = () => {
+    const d = dialog.current;
+    d?.querySelector('video')?.pause();
+    d?.close();
+  };
+
   return (
-    <section className="about section" id="sobre">
-      <div className="wrap about__grid">
-        <figure className="about__img frame" data-reveal>
-          <Photo id={photos.ritual} alt="Massagem facial em ambiente de spa" sizes="(min-width: 900px) 45vw, 100vw" pos="center 35%" />
-          <figcaption className="caption">cuidado com presença</figcaption>
-        </figure>
+    <section className="about section--ink" id="sobre" ref={root} style={{ '--nn': aboutCount + 6 } as CSSProperties}>
+      <div className="about__top" ref={top}>
+        <div className="about__bg" aria-hidden="true">
+          <Photo id={photos.ritual} alt="" className="about__bg-img" pos="50% 40%" sizes="100vw" />
+        </div>
 
-        <div className="about__copy" data-reveal>
-          <p className="label">01 / sobre</p>
-          <h2 className="h2">
-            quem cuida
+        <div className="wrap about__hero">
+          <h2 className="about__title">
+            somos a
             <br />
-            <em>de você.</em>
+            Nativa.
           </h2>
-          <p className="body">
-            A Nativa nasceu da vontade de fazer estética sem pressa e sem promessas milagrosas: avaliação honesta, protocolos pensados para cada pele e um ambiente onde dá para respirar.
-          </p>
+          <div className="about__tags">
+            <p>
+              estética
+              <br />
+              sem pressa
+            </p>
+            <p>
+              cuidado para
+              <br />
+              peles reais
+            </p>
+          </div>
+        </div>
 
-          <h3 className="mini">formação</h3>
-          <ul className="ticks">
-            {credentials.map((c) => (
-              <li key={c}>{c}</li>
+        <div className="wrap">
+          <figure className="about__band">
+            <Photo id={photos.ritual} alt="Massagem facial em ambiente de spa" className="about__band-img" pos="50% 40%" sizes="(min-width: 1320px) 1280px, 100vw" />
+          </figure>
+        </div>
+      </div>
+
+      <div className="wrap about__body">
+        <div className="about__side">
+          <p className="about__label">sobre a clínica</p>
+          <button type="button" className="about__play" onClick={openVideo} aria-label="Assistir ao vídeo da clínica">
+            <Play size={26} strokeWidth={0} fill="currentColor" />
+          </button>
+        </div>
+
+        <div className="about__copy" ref={copyRef}>
+          {aboutParagraphs.map((p) => (
+            <p key={p} className="about__p">
+              {words(p)}
+            </p>
+          ))}
+
+          <div className="about__lists">
+            {aboutBlocks.map((b) => (
+              <div key={b.title}>
+                <h3 className="about__h">{words(b.title)}</h3>
+                <ul className="about__ul">
+                  {b.items.map((c) => (
+                    <li key={c}>{words(c)}</li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
 
-          <h3 className="mini">
-            <ShieldCheck size={16} strokeWidth={1.4} /> biossegurança
-          </h3>
-          <ul className="ticks">
-            {biosafety.map((c) => (
-              <li key={c}>{c}</li>
-            ))}
-          </ul>
-
-          <button type="button" className="btn btn--primary" onClick={onBook}>
-            agendar com a Nativa <ArrowUpRight size={16} strokeWidth={1.6} />
+          <button type="button" className="about__link" onClick={onBook}>
+            ( agendar uma avaliação )
           </button>
         </div>
       </div>
+
+      <dialog className="about__dialog" ref={dialog} onClick={(e) => e.target === e.currentTarget && closeVideo()} aria-label="Vídeo da clínica">
+        <button type="button" className="about__close" onClick={closeVideo} aria-label="Fechar vídeo">
+          <X size={20} strokeWidth={1.5} />
+        </button>
+        {aboutVideo ? (
+          <video src={aboutVideo} controls playsInline autoPlay />
+        ) : (
+          <p className="about__novideo">Vídeo da clínica: defina o arquivo em <code>aboutVideo</code> no App.tsx.</p>
+        )}
+      </dialog>
     </section>
   );
 }
@@ -2697,12 +2812,15 @@ function About({ onBook }: { onBook: () => void }) {
 // ==========================================================================
 
 
-function Testimonials() {
+/**
+ * Carrossel "coverflow" compartilhado (galeria e depoimentos).
+ * Cada cartão recebe sua distância até o centro (--d, com sinal) e o módulo (--a): o CSS faz o resto.
+ */
+function useCoverflow(count: number) {
   const rail = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const last = testimonials.length - 1;
+  const last = count - 1;
 
-  // Cada cartão recebe sua distância até o centro (--d, com sinal) e o módulo (--a): o CSS faz o resto.
   const update = useCallback(() => {
     const el = rail.current;
     if (!el) return;
@@ -2726,19 +2844,18 @@ function Testimonials() {
   useEffect(() => {
     // abre no cartão do meio, para os dois lados já aparecerem
     const el = rail.current;
-    const start = el?.children[Math.floor(testimonials.length / 2)] as HTMLElement | undefined;
+    const start = el?.children[Math.floor(count / 2)] as HTMLElement | undefined;
     if (el && start) el.scrollLeft = start.offsetLeft + start.offsetWidth / 2 - el.clientWidth / 2;
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
-  }, [update]);
+  }, [update, count]);
 
   const goTo = (i: number) => {
     const el = rail.current;
     const card = el?.children[Math.max(0, Math.min(last, i))] as HTMLElement | undefined;
     if (!el || !card) return;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollTo({ left: card.offsetLeft + card.offsetWidth / 2 - el.clientWidth / 2, behavior: reduce ? 'auto' : 'smooth' });
+    el.scrollTo({ left: card.offsetLeft + card.offsetWidth / 2 - el.clientWidth / 2, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
   };
 
   // Mouse: arrastar para o lado (toque e trackpad já rolam nativamente).
@@ -2770,18 +2887,24 @@ function Testimonials() {
       goTo(active); // reassenta no cartão mais próximo do centro
     }
   };
-
-  const onKey = (e: RKeyboardEvent<HTMLDivElement>) => {
+  const onKeyDown = (e: RKeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'ArrowRight') (e.preventDefault(), goTo(active + 1));
     else if (e.key === 'ArrowLeft') (e.preventDefault(), goTo(active - 1));
   };
+
+  const bind = { onScroll: update, onKeyDown, onPointerDown, onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag, onPointerLeave: endDrag };
+  return { rail, active, last, goTo, wasDragged, bind };
+}
+
+function Testimonials() {
+  const { rail, active, last, goTo, wasDragged, bind } = useCoverflow(testimonials.length);
 
   return (
     <section className="voices section section--mist" id="depoimentos">
       <div className="voices__glow" aria-hidden="true" />
       <div className="wrap">
         <SectionHead
-          index="10"
+          index="11"
           label="depoimentos"
           title={
             <>
@@ -2800,13 +2923,7 @@ function Testimonials() {
         role="region"
         aria-roledescription="carrossel"
         aria-label="Depoimentos, deslize para o lado"
-        onScroll={update}
-        onKeyDown={onKey}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onPointerLeave={endDrag}
+        {...bind}
       >
         {testimonials.map((t, i) => (
           <figure key={t.name} className={`voice${i === active ? ' is-active' : ''}`} aria-hidden={i === active ? undefined : true} onClick={() => i !== active && !wasDragged.current && goTo(i)}>
@@ -2847,11 +2964,32 @@ function Testimonials() {
 }
 
 function Gallery() {
+  const { rail, active, last, goTo, wasDragged, bind } = useCoverflow(gallery.length);
+  const section = useRef<HTMLElement>(null);
+
+  // Ao chegar na última foto, a página desce sozinha e suave até os depoimentos,
+  // como se galeria e depoimentos fossem um único movimento.
+  // Cancela se a pessoa trocar de foto ou rolar a página por conta própria nesse meio-tempo.
+  useEffect(() => {
+    if (active !== last) return;
+    const el = section.current;
+    if (!el) return;
+    const y0 = window.scrollY;
+    const id = window.setTimeout(() => {
+      if (Math.abs(window.scrollY - y0) > 40) return;
+      const r = el.getBoundingClientRect();
+      const visible = r.top < window.innerHeight * 0.7 && r.bottom > window.innerHeight * 0.3;
+      if (visible) scrollToId('depoimentos');
+    }, 1100);
+    return () => window.clearTimeout(id);
+  }, [active, last]);
+
   return (
-    <section className="gallery section" id="galeria">
+    <section className="voices gallery section section--mist" id="galeria" ref={section}>
+      <div className="voices__glow" aria-hidden="true" />
       <div className="wrap">
         <SectionHead
-          index="11"
+          index="10"
           label="galeria"
           title={
             <>
@@ -2862,18 +3000,54 @@ function Gallery() {
           }
         />
       </div>
-      <div className="gallery__rail">
+
+      <div
+        className="voices__rail"
+        ref={rail}
+        tabIndex={0}
+        role="region"
+        aria-roledescription="carrossel"
+        aria-label="Galeria, deslize para o lado"
+        {...bind}
+      >
         {gallery.map((g, i) => (
-          <figure key={g.caption} className={`gallery__item gallery__item--${(i % 3) + 1} frame`}>
-            <Photo id={g.id} alt={g.alt} sizes="(min-width: 900px) 30vw, 70vw" />
-            <figcaption className="caption">{g.caption}</figcaption>
+          <figure key={g.caption} className={`voice${i === active ? ' is-active' : ''}`} aria-hidden={i === active ? undefined : true} onClick={() => i !== active && !wasDragged.current && goTo(i)}>
+            <Photo id={g.id} alt={g.alt} className="voice__photo" pos="50% 40%" sizes="(min-width: 720px) 440px, 78vw" />
+            <div className="voice__glass">
+              <Camera size={20} strokeWidth={1.2} />
+              <p className="voice__cap">{g.caption}</p>
+              <figcaption>
+                <small>
+                  {String(i + 1).padStart(2, '0')} / {String(gallery.length).padStart(2, '0')}
+                </small>
+              </figcaption>
+            </div>
           </figure>
         ))}
       </div>
-      <div className="wrap center">
-        <a className="btn btn--ghost" href={`https://instagram.com/${contact.instagram}`} target="_blank" rel="noopener noreferrer">
-          ver mais no instagram <ArrowUpRight size={16} strokeWidth={1.6} />
-        </a>
+
+      <div className="wrap">
+        <div className="voices__ctrl">
+          <p className="voices__count" aria-live="polite">
+            <b>{String(active + 1).padStart(2, '0')}</b> / {String(gallery.length).padStart(2, '0')}
+          </p>
+          <div className="voices__bar" aria-hidden="true">
+            <i style={{ transform: `scaleX(${(active + 1) / gallery.length})` }} />
+          </div>
+          <div className="voices__btns">
+            <button type="button" className="btn btn--ghost btn--sm voices__arrow" onClick={() => goTo(active - 1)} disabled={active === 0} aria-label="Foto anterior">
+              <ArrowLeft size={18} strokeWidth={1.4} />
+            </button>
+            <button type="button" className="btn btn--ghost btn--sm voices__arrow" onClick={() => goTo(active + 1)} disabled={active === last} aria-label="Próxima foto">
+              <ArrowRight size={18} strokeWidth={1.4} />
+            </button>
+          </div>
+        </div>
+        <div className="center">
+          <a className="btn btn--ghost" href={`https://instagram.com/${contact.instagram}`} target="_blank" rel="noopener noreferrer">
+            ver mais no instagram <ArrowUpRight size={16} strokeWidth={1.6} />
+          </a>
+        </div>
       </div>
     </section>
   );
