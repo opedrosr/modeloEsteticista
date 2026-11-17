@@ -430,22 +430,42 @@ const credentials = [
   'Formação em drenagem linfática',
 ];
 
-/** PLACEHOLDER — troque por depoimentos reais, com autorização das clientes. */
+/** PLACEHOLDER — troque por depoimentos reais, com autorização escrita das clientes (texto e foto). */
 const testimonials = [
   {
     name: 'Camila R.',
     detail: 'ritual de presença',
     text: 'Entrei no ritmo do dia a dia e saí com a pele e a cabeça mais leves. A avaliação mudou minha rotina em casa.',
+    photo: photos.hero,
+    pos: '50% 28%',
   },
   {
     name: 'Juliana M.',
     detail: 'jornada nativa',
     text: 'Cuidado de verdade, sem pressa e sem empurrar procedimento. Explicaram cada etapa e o que esperar.',
+    photo: photos.philosophy,
+    pos: '50% 30%',
   },
   {
     name: 'Patrícia S.',
     detail: 'toque profundo',
     text: 'A massagem do rosto desfez uma tensão que eu nem sabia que tinha. Marquei a próxima antes de sair.',
+    photo: photos.ritual,
+    pos: '50% 35%',
+  },
+  {
+    name: 'Renata A.',
+    detail: 'peeling suave',
+    text: 'Minha pele ficou uniforme sem aquela vermelhidão de susto. Tudo explicado com calma, do começo ao fim.',
+    photo: photos.facial,
+    pos: '50% 35%',
+  },
+  {
+    name: 'Bianca L.',
+    detail: 'clube nativa',
+    text: 'Virou meu horário fixo do mês. É o único compromisso que eu realmente espero chegar.',
+    photo: photos.products,
+    pos: '50% 40%',
   },
 ];
 
@@ -2678,8 +2698,87 @@ function About({ onBook }: { onBook: () => void }) {
 
 
 function Testimonials() {
+  const rail = useRef<HTMLDivElement>(null);
+  const [active, setActive] = useState(0);
+  const last = testimonials.length - 1;
+
+  // Cada cartão recebe sua distância até o centro (--d, com sinal) e o módulo (--a): o CSS faz o resto.
+  const update = useCallback(() => {
+    const el = rail.current;
+    if (!el) return;
+    const cards = Array.from(el.children) as HTMLElement[];
+    const mid = el.scrollLeft + el.clientWidth / 2;
+    const step = (cards[1]?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0) || cards[0]?.offsetWidth || 1;
+    let best = 0;
+    let bestDist = Infinity;
+    cards.forEach((card, i) => {
+      const d = (card.offsetLeft + card.offsetWidth / 2 - mid) / step;
+      card.style.setProperty('--d', d.toFixed(3));
+      card.style.setProperty('--a', Math.min(Math.abs(d), 2.5).toFixed(3));
+      if (Math.abs(d) < bestDist) {
+        bestDist = Math.abs(d);
+        best = i;
+      }
+    });
+    setActive((prev) => (prev === best ? prev : best));
+  }, []);
+
+  useEffect(() => {
+    // abre no cartão do meio, para os dois lados já aparecerem
+    const el = rail.current;
+    const start = el?.children[Math.floor(testimonials.length / 2)] as HTMLElement | undefined;
+    if (el && start) el.scrollLeft = start.offsetLeft + start.offsetWidth / 2 - el.clientWidth / 2;
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [update]);
+
+  const goTo = (i: number) => {
+    const el = rail.current;
+    const card = el?.children[Math.max(0, Math.min(last, i))] as HTMLElement | undefined;
+    if (!el || !card) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollTo({ left: card.offsetLeft + card.offsetWidth / 2 - el.clientWidth / 2, behavior: reduce ? 'auto' : 'smooth' });
+  };
+
+  // Mouse: arrastar para o lado (toque e trackpad já rolam nativamente).
+  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
+  const wasDragged = useRef(false);
+  const onPointerDown = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false };
+  };
+  const onPointerMove = (e: RPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    if (!d.moved && Math.abs(dx) < 5) return;
+    if (!d.moved) {
+      d.moved = true;
+      e.currentTarget.classList.add('is-dragging');
+    }
+    e.currentTarget.scrollLeft = d.left - dx;
+  };
+  const endDrag = (e: RPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    e.currentTarget.classList.remove('is-dragging');
+    if (d?.moved) {
+      // o clique que o navegador dispara ao soltar o mouse não deve trocar de cartão
+      wasDragged.current = true;
+      window.setTimeout(() => (wasDragged.current = false), 0);
+      goTo(active); // reassenta no cartão mais próximo do centro
+    }
+  };
+
+  const onKey = (e: RKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowRight') (e.preventDefault(), goTo(active + 1));
+    else if (e.key === 'ArrowLeft') (e.preventDefault(), goTo(active - 1));
+  };
+
   return (
     <section className="voices section section--mist" id="depoimentos">
+      <div className="voices__glow" aria-hidden="true" />
       <div className="wrap">
         <SectionHead
           index="10"
@@ -2693,17 +2792,55 @@ function Testimonials() {
           }
         />
       </div>
-      <div className="voices__rail" tabIndex={0} role="region" aria-label="Depoimentos, deslize para o lado">
-        {testimonials.map((t) => (
-          <figure key={t.name} className="voice">
-            <Quote size={22} strokeWidth={1.2} />
-            <blockquote>{t.text}</blockquote>
-            <figcaption>
-              <strong>{t.name}</strong>
-              <small>{t.detail}</small>
-            </figcaption>
+
+      <div
+        className="voices__rail"
+        ref={rail}
+        tabIndex={0}
+        role="region"
+        aria-roledescription="carrossel"
+        aria-label="Depoimentos, deslize para o lado"
+        onScroll={update}
+        onKeyDown={onKey}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={endDrag}
+      >
+        {testimonials.map((t, i) => (
+          <figure key={t.name} className={`voice${i === active ? ' is-active' : ''}`} aria-hidden={i === active ? undefined : true} onClick={() => i !== active && !wasDragged.current && goTo(i)}>
+            <Photo id={t.photo} alt="" className="voice__photo" pos={t.pos} sizes="(min-width: 720px) 440px, 78vw" />
+            <div className="voice__glass">
+              <Quote size={20} strokeWidth={1.2} />
+              <blockquote>{t.text}</blockquote>
+              <figcaption>
+                <strong>{t.name}</strong>
+                <small>{t.detail}</small>
+              </figcaption>
+            </div>
           </figure>
         ))}
+      </div>
+
+      <div className="wrap">
+        <div className="voices__ctrl">
+          <p className="voices__count" aria-live="polite">
+            <b>{String(active + 1).padStart(2, '0')}</b> / {String(testimonials.length).padStart(2, '0')}
+          </p>
+          <div className="voices__bar" aria-hidden="true">
+            <i style={{ transform: `scaleX(${(active + 1) / testimonials.length})` }} />
+          </div>
+          <div className="voices__btns">
+            <button type="button" className="btn btn--ghost btn--sm voices__arrow" onClick={() => goTo(active - 1)} disabled={active === 0} aria-label="Depoimento anterior">
+              <ArrowLeft size={18} strokeWidth={1.4} />
+            </button>
+            <button type="button" className="btn btn--ghost btn--sm voices__arrow" onClick={() => goTo(active + 1)} disabled={active === last} aria-label="Próximo depoimento">
+              <ArrowRight size={18} strokeWidth={1.4} />
+            </button>
+          </div>
+        </div>
+        <p className="voices__note">Depoimentos ilustrativos. Substitua por relatos reais, com autorização das clientes.</p>
       </div>
     </section>
   );
