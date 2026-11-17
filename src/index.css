@@ -754,6 +754,15 @@ img {
   to { clip-path: inset(-60px); opacity: 1; }
 }
 
+/* celular: palavra mais alta e quase de borda a borda; computador mantém a versão larga */
+.hero__svg--tall { display: none; }
+
+@media (max-width: 719px) {
+  .hero__svg--wide { display: none; }
+  .hero__svg--tall { display: block; }
+  .hero__word { padding-inline: 12px; }
+}
+
 /* ——— marquee ——— */
 
 .marquee {
@@ -2688,8 +2697,8 @@ img {
    ========================================================================== */
 
 .faq__grid { display: grid; gap: 28px; }
-.faq__list { border-top: 1px solid var(--ink); }
-.faq__item { border-bottom: 1px solid var(--line); }
+.faq__list { border-top: 1px solid rgba(255, 255, 255, 0.7); }
+.faq__item { border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
 
 .faq__q {
   align-items: center;
@@ -2706,7 +2715,11 @@ img {
 
 .faq__icon { flex: none; transition: transform 0.45s var(--ease); }
 .faq__item--open .faq__icon { transform: rotate(45deg); }
-.faq__a { color: var(--muted); max-width: 560px; padding: 0 0 24px; }
+.faq__a { color: rgba(255, 255, 255, 0.78); max-width: 560px; padding: 0 0 24px; }
+
+/* fundo preto, letras brancas */
+.faq { background: #000; color: #fff; }
+.faq .label { color: var(--on-ink-muted); }
 
 /* ==========================================================================
    LOCAL
@@ -2760,28 +2773,19 @@ img {
 .footer__col a { align-items: center; display: flex; gap: 8px; min-height: 40px; color: #fff; }
 
 .footer__word {
-  color: #fff;
-  font-family: var(--sans);
-  font-size: clamp(120px, 30vw, 420px);
-  font-weight: 700;
-  letter-spacing: -0.09em;
-  line-height: 0.85;
-  height: 0.43em;
+  display: block;
+  height: auto;
+  margin-top: 48px;
   overflow: hidden;
-  padding-left: var(--gutter);
-  white-space: nowrap;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 55px;
   user-select: none;
+  width: 100%;
 }
 
-.footer__legal { border-top: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.65); display: grid; gap: 8px; margin-top: 44px; padding-top: 20px; }
+.footer__word text { fill: #fff; }
+
+.footer__legal { border-top: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.65); display: grid; gap: 8px; margin-top: 0; padding-top: 20px; }
 .footer__legal small { font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
 
-@media (max-width: 480px) {
-  .footer__word { font-size: 29vw; }
-}
 
 /* ——— barra fixa de CTA ——— */
 

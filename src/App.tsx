@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent as RUIEvent, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type Ref, type UIEvent as RUIEvent, type KeyboardEvent as RKeyboardEvent, type MouseEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type * as THREE from 'three';
 import {
   ArrowDown,
@@ -898,10 +898,47 @@ function Header({ onBook }: { onBook: () => void }) {
 /** Palavra do hero: fonte da marca. 330 unidades de fonte + textLength 988 = encaixe de ponta a ponta, sem comprimir o espaçamento. */
 const heroWordStyle: CSSProperties = { fontFamily: 'var(--serif)', fontSize: 330 };
 
+/**
+ * A palavra do hero em dois formatos: larga (computador) e alta (celular).
+ * No celular a largura da tela limita o tamanho, então a palavra é esticada 1,4× na vertical
+ * e os glifos ficam levemente condensados: bem maior, sem estourar a largura.
+ */
+function HeroWord({ tall, gRef }: { tall?: boolean; gRef: Ref<SVGGElement> }) {
+  const k = tall ? 1.4 : 1;
+  const id = tall ? 'hero-word-tall' : 'hero-word';
+  return (
+    <svg className={`hero__svg hero__svg--${tall ? 'tall' : 'wide'}`} viewBox={`0 0 1000 ${300 * k}`} aria-hidden="true" focusable="false">
+      <defs>
+        <mask id={id} maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height={340 * k}>
+          <text
+            x="4"
+            y={280 * k}
+            textLength={988}
+            lengthAdjust={tall ? 'spacingAndGlyphs' : 'spacing'}
+            fill="#fff"
+            stroke="#fff"
+            strokeWidth="2"
+            strokeLinejoin="round"
+            style={{ ...heroWordStyle, fontSize: 330 * k }}
+          >
+            nativa
+          </text>
+        </mask>
+      </defs>
+      <g mask={`url(#${id})`}>
+        <rect x="-20" y="-20" width="1040" height={340 * k} fill="#8f8a7f" />
+        <g ref={gRef}>
+          <image href={pexelsUrl(photos.hero, 1600)} x="-40" y={-170 * k} width="1080" height={520 * k} preserveAspectRatio="xMidYMid slice" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
 function Hero() {
   const media = useRef<HTMLDivElement>(null);
   const shift = useRef<SVGGElement>(null);
-  const word = useRef<SVGSVGElement>(null);
+  const shiftTall = useRef<SVGGElement>(null);
 
   // Parallax sem re-render do React: o fundo desfocado desce devagar e a foto dentro das letras
   // acompanha o scroll (vertical) e o mouse (horizontal), como se as letras fossem uma janela.
@@ -916,7 +953,9 @@ function Hero() {
       const y = window.scrollY;
       if (y > window.innerHeight * 1.2) return;
       if (media.current) media.current.style.transform = `translate3d(0, ${y * 0.08}px, 0) scale(1.06)`;
-      shift.current?.setAttribute('transform', `translate(${px.toFixed(1)} ${Math.min(y * 0.1, 70).toFixed(1)})`);
+      const move = `translate(${px.toFixed(1)} ${Math.min(y * 0.1, 70).toFixed(1)})`;
+      shift.current?.setAttribute('transform', move);
+      shiftTall.current?.setAttribute('transform', move);
     };
     const queue = () => {
       if (!raf) raf = requestAnimationFrame(draw);
@@ -973,31 +1012,8 @@ function Hero() {
       <div className="hero__word">
         <h1 className="hero__title">
           <span className="sr-only">nativa, beleza que respira</span>
-          <svg ref={word} className="hero__svg" viewBox="0 0 1000 300" aria-hidden="true" focusable="false">
-            <defs>
-              <mask id="hero-word" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="340">
-                <text
-                  x="4"
-                  y="280"
-                  textLength={988}
-                  lengthAdjust="spacing"
-                  fill="#fff"
-                  stroke="#fff"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                  style={heroWordStyle}
-                >
-                  nativa
-                </text>
-              </mask>
-            </defs>
-            <g mask="url(#hero-word)">
-              <rect x="-20" y="-20" width="1040" height="340" fill="#8f8a7f" />
-              <g ref={shift}>
-                <image href={pexelsUrl(photos.hero, 1600)} x="-40" y="-170" width="1080" height="520" preserveAspectRatio="xMidYMid slice" />
-              </g>
-            </g>
-          </svg>
+          <HeroWord gRef={shift} />
+          <HeroWord tall gRef={shiftTall} />
         </h1>
       </div>
     </section>
@@ -3205,7 +3221,7 @@ function Gallery() {
 function FAQ() {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section className="faq section section--stone" id="duvidas">
+    <section className="faq section section--ink" id="duvidas">
       <div className="wrap faq__grid">
         <div className="faq__head" data-reveal>
           <p className="label">12 / dúvidas</p>
@@ -3397,7 +3413,12 @@ function Footer() {
           <a href={`mailto:${contact.email}`}><Mail size={15} strokeWidth={1.4} /> {contact.email}</a>
         </div>
       </div>
-      <div className="footer__word" aria-hidden="true">nativa</div>
+      {/* palavra gigante de ponta a ponta, cortada na metade: só a parte de cima das letras aparece */}
+      <svg className="footer__word" viewBox="0 0 1000 148" aria-hidden="true" focusable="false">
+        <text x="-14" y="228" textLength={1028} lengthAdjust="spacingAndGlyphs" style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: 300 }}>
+          nativa
+        </text>
+      </svg>
       <div className="wrap footer__legal">
         <small>© {new Date().getFullYear()} Nativa Estética</small>
         <small>{contact.cancellation}</small>
