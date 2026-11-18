@@ -1962,6 +1962,7 @@ img {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   content: '';
   inset: 0;
+  mix-blend-mode: multiply;
   opacity: 0.22;
   pointer-events: none;
   position: absolute;
@@ -1984,29 +1985,7 @@ img {
 .ba__col--intro { display: grid; gap: 14px; }
 .ba__title { line-height: 0; margin: 0; }
 
-/* letras: a foto (preto e branco) anda por baixo; a placa de areia com as letras vazadas fica parada */
-.ba__letters {
-  aspect-ratio: 1000 / 840;
-  background: #6f6c66;
-  display: block;
-  margin-inline: auto;
-  overflow: hidden;
-  position: relative;
-  width: min(100%, calc(52svh * 1.1905));
-}
-
-.ba__photo {
-  display: block;
-  filter: grayscale(1) contrast(1.25);
-  inset: 0;
-  position: absolute;
-  transform-origin: 50% 50%;
-  will-change: transform;
-}
-
-.ba__photo-img { display: block; height: 123.8%; left: -6%; object-fit: cover; position: absolute; top: -11.9%; width: 112%; }
-.ba__cover { display: block; height: 100%; inset: 0; position: absolute; width: 100%; }
-
+/* letras nítidas em preto e branco, com a mesma sombra da hero */
 .ba__svg {
   display: block;
   filter: grayscale(1) contrast(1.25);
@@ -2052,7 +2031,6 @@ img {
   .ba__label { align-self: end; grid-area: label; }
   .ba__copy { align-self: start; grid-area: copy; }
   .ba__svg { max-height: 68svh; }
-  .ba__letters { width: min(100%, calc(68svh * 1.1905)); }
 }
 
 /* 2 e 3 — comparador: moldura mais quadrada que retangular, tamanho limitado pela altura da tela */
@@ -2101,11 +2079,9 @@ img {
 .ba__side { inset: 0; overflow: hidden; pointer-events: none; position: absolute; }
 .ba__fill,
 .ba__fit { height: 100%; inset: 0; pointer-events: none; position: absolute; width: 100%; }
-.ba__fill { object-fit: cover; opacity: 0.9; }
+.ba__fill { filter: blur(12px) saturate(1.1) brightness(0.92); object-fit: cover; transform: scale(1.25); }
 .ba__fit { object-fit: contain; }
-/* o comparador corre só com transform: a faixa anda para um lado e a foto anda para o outro */
-.ba__wipe { inset: 0; overflow: hidden; pointer-events: none; position: absolute; transform: translate3d(calc(var(--pos) - 100%), 0, 0); will-change: transform; }
-.ba__side--before { transform: translate3d(calc(100% - var(--pos)), 0, 0); will-change: transform; }
+.ba__side--before { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
 
 /* só enquanto as duas fotos são a mesma de exemplo: o "antes" é tratado para ilustrar */
 .ba[data-demo] .ba__side--before { filter: saturate(0.5) contrast(0.88) brightness(0.96) sepia(0.2); }
@@ -2259,16 +2235,6 @@ img {
   backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
 }
 
-/* vidro canelado "assado": a palavra já distorcida vira a camada de baixo do cartão (celular, Safari e qualquer navegador sem filtro SVG no backdrop) */
-.packages[data-baked] .pk {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background:
-    radial-gradient(120% 40% at 18% 0%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 70%),
-    linear-gradient(180deg, rgba(37, 37, 34, 0.46) 0%, rgba(37, 37, 34, 0.72) 100%),
-    var(--pk-img, none) 0 0 / 100% var(--pk-rh, 0) no-repeat;
-}
-
 .pk--featured {
   background: linear-gradient(180deg, rgba(243, 241, 235, 0.2) 0%, rgba(37, 37, 34, 0.58) 100%);
   border-color: rgba(255, 255, 255, 0.34);
@@ -2311,12 +2277,6 @@ img {
 .pk .btn--light { box-shadow: inset 0 1px 1px #fff, 0 10px 26px rgba(0, 0, 0, 0.3); }
 .pk .btn--ghost-light { background: rgba(255, 255, 255, 0.06); }
 
-.packages[data-baked] .pk--featured {
-  background:
-    linear-gradient(180deg, rgba(243, 241, 235, 0.2) 0%, rgba(37, 37, 34, 0.58) 100%),
-    var(--pk-img, none) 0 0 / 100% var(--pk-rh, 0) no-repeat;
-}
-
 /* contador + linha de progresso (só no carrossel do celular) */
 .pk-nav { display: none; }
 
@@ -2328,7 +2288,7 @@ img {
     display: flex;
     gap: 14px;
     margin-inline: calc(var(--gutter) * -1);
-    margin-top: -15cqw;
+    margin-top: -29cqw;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
@@ -2342,17 +2302,42 @@ img {
 
   .pk-grid::-webkit-scrollbar { display: none; }
 
+  /* a palavra fica bem maior que a tela e desliza atrás do vidro conforme os cartões passam
+     (--pk-p vai de 0 a 1 com a rolagem do trilho); assim o vidro tem muita letra para refratar, como no desktop */
+  .pk-wordbox {
+    margin-inline: calc(var(--gutter) * -1);
+    overflow: hidden;
+    padding-left: var(--gutter);
+  }
+
+  .pk-word {
+    max-width: none;
+    transform: translate3d(calc(var(--pk-p, 0) * -52cqw), 0, 0);
+    width: 152cqw;
+    will-change: transform;
+  }
+
+  /* manchas de cor logo atrás dos cartões (no celular a seção é alta, então em % elas ficavam longe) */
+  .packages .liquid { opacity: 0.85; }
+  .packages .liquid i:nth-child(1) { left: -240px; top: 150px; }
+  .packages .liquid i:nth-child(2) { right: -260px; top: 330px; }
+  .packages .liquid i:nth-child(3) { bottom: auto; left: 8%; top: 560px; }
+
   .packages[data-flute] .pk-grid > .pk {
-    -webkit-backdrop-filter: url(#pk-flute-m) blur(1px) brightness(1.12);
-    backdrop-filter: url(#pk-flute-m) blur(1px) brightness(1.12);
+    -webkit-backdrop-filter: url(#pk-flute) blur(0.6px) brightness(1.18);
+    backdrop-filter: url(#pk-flute) blur(0.6px) brightness(1.18);
   }
 
   .pk-grid > .pk {
     /* mesmo vidro canelado do desktop; Safari sem suporte cai no desfoque + estrias */
-    -webkit-backdrop-filter: blur(5px) brightness(1.1);
-    backdrop-filter: blur(5px) brightness(1.1);
-    /* mesmo vidro canelado do desktop; Safari sem suporte cai no desfoque + estrias */
+    -webkit-backdrop-filter: blur(3px) brightness(1.15);
+    backdrop-filter: blur(3px) brightness(1.15);
+    /* menos tinta que no desktop: o que passa atrás aparece e o vidro deixa de parecer opaco */
+    background:
+      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, rgba(37, 37, 34, 0.2) 0%, rgba(37, 37, 34, 0.34) 38%, rgba(37, 37, 34, 0.66) 100%);
     flex: 0 0 calc(100% - var(--gutter) * 2 - var(--pk-peek));
+    padding-top: calc(27cqw + 20px);
     min-width: 0;
     scroll-snap-align: start;
     scroll-snap-stop: always;
@@ -2399,6 +2384,12 @@ img {
     transform: scaleX(0);
     transform-origin: left;
     transition: transform 0.5s var(--ease);
+  }
+
+  .pk-grid > .pk--featured {
+    background:
+      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, rgba(243, 241, 235, 0.14) 0%, rgba(37, 37, 34, 0.34) 40%, rgba(37, 37, 34, 0.62) 100%);
   }
 
   .pk-dot--active { flex: 2.2; }
