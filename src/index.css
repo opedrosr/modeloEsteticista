@@ -2288,7 +2288,7 @@ img {
     display: flex;
     gap: 14px;
     margin-inline: calc(var(--gutter) * -1);
-    margin-top: -13cqw;
+    margin-top: -19cqw;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
@@ -2303,8 +2303,8 @@ img {
   .pk-grid::-webkit-scrollbar { display: none; }
 
   .packages[data-flute] .pk-grid > .pk {
-    -webkit-backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
-    backdrop-filter: url(#pk-flute) blur(1px) brightness(1.12);
+    -webkit-backdrop-filter: url(#pk-flute-m) blur(1px) brightness(1.12);
+    backdrop-filter: url(#pk-flute-m) blur(1px) brightness(1.12);
   }
 
   .pk-grid > .pk {
@@ -2312,6 +2312,7 @@ img {
     -webkit-backdrop-filter: blur(5px) brightness(1.1);
     backdrop-filter: blur(5px) brightness(1.1);
     /* mesmo vidro canelado do desktop; Safari sem suporte cai no desfoque + estrias */
+    padding-top: calc(19cqw + 20px);
     flex: 0 0 calc(100% - var(--gutter) * 2 - var(--pk-peek));
     min-width: 0;
     scroll-snap-align: start;

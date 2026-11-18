@@ -2720,6 +2720,11 @@ function Packages() {
           <feTile in="tile" result="map" />
           <feDisplacementMap in="SourceGraphic" in2="map" scale="30" xChannelSelector="R" yChannelSelector="G" />
         </filter>
+        <filter id="pk-flute-m" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
+          <feImage href={fluteMap} x="0" y="0" width="12" height="8" result="tile" />
+          <feTile in="tile" result="map" />
+          <feDisplacementMap in="SourceGraphic" in2="map" scale="18" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
       </svg>
 
       <div className="liquid" aria-hidden="true">
