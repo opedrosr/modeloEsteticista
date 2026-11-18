@@ -2512,6 +2512,73 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
   const range = useRef<HTMLInputElement>(null);
   const imgG = useRef<SVGGElement>(null);
   const lineRefs = useRef<(SVGTextElement | null)[]>([]);
+  // Foto das letras em preto e branco, contraste e suavizada UMA vez (antes o navegador refazia o desfoque
+  // e o filtro a cada frame da rolagem, o que travava o celular). Se não der (CORS), volta aos filtros.
+  const [letterSrc, setLetterSrc] = useState<string | null>(null);
+  const [letterFx, setLetterFx] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const w = 640;
+        const h = Math.max(1, Math.round((w * img.naturalHeight) / Math.max(1, img.naturalWidth)));
+        const cv = document.createElement('canvas');
+        cv.width = w;
+        cv.height = h;
+        const g = cv.getContext('2d');
+        if (!g) throw new Error('canvas');
+        g.drawImage(img, 0, 0, w, h);
+        const data = g.getImageData(0, 0, w, h);
+        const px = data.data;
+        let ch = new Float32Array(w * h);
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) ch[j] = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+        // desfoque suave (3 passadas de média, ~ o mesmo do filtro antigo)
+        const blur = (src: Float32Array, r: number) => {
+          const tmp = new Float32Array(w * h);
+          const dst = new Float32Array(w * h);
+          const n = 2 * r + 1;
+          for (let y = 0; y < h; y++) {
+            let acc = 0;
+            for (let k = -r; k <= r; k++) acc += src[y * w + Math.min(w - 1, Math.max(0, k))];
+            for (let x = 0; x < w; x++) {
+              tmp[y * w + x] = acc / n;
+              acc += src[y * w + Math.min(w - 1, x + r + 1)] - src[y * w + Math.max(0, x - r)];
+            }
+          }
+          for (let x = 0; x < w; x++) {
+            let acc = 0;
+            for (let k = -r; k <= r; k++) acc += tmp[Math.min(h - 1, Math.max(0, k)) * w + x];
+            for (let y = 0; y < h; y++) {
+              dst[y * w + x] = acc / n;
+              acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+            }
+          }
+          return dst;
+        };
+        for (let pass = 0; pass < 3; pass++) ch = blur(ch, 4);
+        for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+          const v = Math.max(0, Math.min(255, (ch[j] - 127.5) * 1.25 + 127.5));
+          px[i] = px[i + 1] = px[i + 2] = v;
+          px[i + 3] = 255;
+        }
+        g.putImageData(data, 0, 0);
+        const url = cv.toDataURL('image/jpeg', 0.9);
+        if (alive) setLetterSrc(url);
+      } catch {
+        if (alive) setLetterFx(true);
+      }
+    };
+    img.onerror = () => {
+      if (alive) setLetterFx(true);
+    };
+    img.src = photoSrc(baLetterPhoto, 640);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const el = root.current;
@@ -2526,6 +2593,17 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
     }
     let raf = 0;
     let lastC = -1;
+    let lastA = -1;
+    let live = false;
+    let done = false;
+    const cache: Record<string, string> = {};
+    // só escreve a variável se o valor mudou: cada escrita invalida o estilo da seção inteira
+    const setVar = (k: string, v: string) => {
+      if (cache[k] !== v) {
+        cache[k] = v;
+        el.style.setProperty(k, v);
+      }
+    };
     const tick = () => {
       raf = 0;
       const vh = window.innerHeight;
@@ -2534,18 +2612,28 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
       const a = clamp(p / 0.36, 0, 1); // escrita
       const x = sstep(0, 1, clamp((p - 0.34) / 0.2, 0, 1)); // troca: escrita sai, comparador entra
       const c = clamp((p - 0.54) / 0.4, 0, 1); // comparador corre
-      el.style.setProperty('--a', a.toFixed(4));
-      el.style.setProperty('--x', x.toFixed(4));
-      el.style.setProperty('--c', c.toFixed(4));
-      if (x > 0.6) el.setAttribute('data-live', '');
-      else el.removeAttribute('data-live');
-      if (c > 0.6) el.setAttribute('data-done', '');
-      else el.removeAttribute('data-done');
+      setVar('--a', a.toFixed(4));
+      setVar('--x', x.toFixed(4));
+      setVar('--c', c.toFixed(4));
+      if ((x > 0.6) !== live) {
+        live = x > 0.6;
+        if (live) el.setAttribute('data-live', '');
+        else el.removeAttribute('data-live');
+      }
+      if ((c > 0.6) !== done) {
+        done = c > 0.6;
+        if (done) el.setAttribute('data-done', '');
+        else el.removeAttribute('data-done');
+      }
 
       // dentro das letras: a foto desliza e cresce; as linhas se afastam, uma para cada lado
-      const s = 1 + a * 0.1;
-      imgG.current?.setAttribute('transform', `translate(500 420) scale(${s.toFixed(4)}) translate(${((0.5 - a) * 50 - 500).toFixed(1)} ${((0.5 - a) * 90 - 420).toFixed(1)})`);
-      lineRefs.current.forEach((t, i) => t?.setAttribute('transform', `translate(${((0.5 - a) * 34 * (i % 2 ? -1 : 1)).toFixed(1)} 0)`));
+      // (só mexe no SVG enquanto a escrita ainda está se movendo)
+      if (a !== lastA) {
+        lastA = a;
+        const s = 1 + a * 0.1;
+        imgG.current?.setAttribute('transform', `translate(500 420) scale(${s.toFixed(4)}) translate(${((0.5 - a) * 50 - 500).toFixed(1)} ${((0.5 - a) * 90 - 420).toFixed(1)})`);
+        lineRefs.current.forEach((t, i) => t?.setAttribute('transform', `translate(${((0.5 - a) * 34 * (i % 2 ? -1 : 1)).toFixed(1)} 0)`));
+      }
 
       // só mexe no comparador enquanto a rolagem o move: depois disso a pessoa pode arrastar
       if (c !== lastC) {
@@ -2575,7 +2663,7 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
             <p className="label ba__label">06 / resultados</p>
             <h2 className="ba__title">
               <span className="sr-only">uma pele cuidada não precisa dizer nada</span>
-              <svg className="ba__svg" viewBox="0 0 1000 840" aria-hidden="true" focusable="false">
+              <svg className={`ba__svg${letterFx ? ' ba__svg--fx' : ''}`} viewBox="0 0 1000 840" aria-hidden="true" focusable="false">
                 <defs>
                   <filter id="ba-soft" x="-5%" y="-5%" width="110%" height="110%">
                     <feGaussianBlur stdDeviation="8" />
@@ -2605,7 +2693,17 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
                 <g mask="url(#ba-word)">
                   <rect x="-20" y="-20" width="1040" height="880" fill="#6f6c66" />
                   <g ref={imgG}>
-                    <image href={photoSrc(baLetterPhoto, 1600)} filter="url(#ba-soft)" x="-60" y="-100" width="1120" height="1040" preserveAspectRatio="xMidYMid slice" />
+                    {letterSrc || letterFx ? (
+                      <image
+                        href={letterSrc ?? photoSrc(baLetterPhoto, 1600)}
+                        filter={letterSrc ? undefined : 'url(#ba-soft)'}
+                        x="-60"
+                        y="-100"
+                        width="1120"
+                        height="1040"
+                        preserveAspectRatio="xMidYMid slice"
+                      />
+                    ) : null}
                   </g>
                 </g>
               </svg>
