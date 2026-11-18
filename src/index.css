@@ -2177,6 +2177,9 @@ img {
 .pk-word { display: block; height: auto; overflow: visible; pointer-events: none; user-select: none; width: 100%; }
 .pk-word text { fill: var(--sand); }
 
+/* canvas do vidro canelado: só existem no celular (ver @media abaixo) */
+.pk-wordcv, .pk__flute { display: none; }
+
 /* os cartões sobem sobre a metade de baixo das letras */
 .pk-grid { display: grid; gap: 16px; margin-top: -13cqw; position: relative; z-index: 1; }
 
@@ -2307,14 +2310,21 @@ img {
   .pk-wordbox {
     margin-inline: calc(var(--gutter) * -1);
     overflow: hidden;
-    padding-left: var(--gutter);
   }
 
-  .pk-word {
-    max-width: none;
-    transform: translate3d(calc(var(--pk-p, 0) * -170cqw), 0, 0);
-    width: 270cqw;
-    will-change: transform;
+  /* no celular a palavra e o vidro são desenhados em canvas (o JS cuida): funciona em qualquer navegador,
+     inclusive iPhone, que não aceita o filtro SVG dentro do backdrop-filter */
+  .pk-word { display: none; }
+  .pk-wordcv { display: block; height: 66.15cqw; width: 100%; }
+
+  .pk-grid > .pk > .pk__flute {
+    display: block;
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: 100%;
+    z-index: -1;
   }
 
   /* manchas de cor logo atrás dos cartões (no celular a seção é alta, então em % elas ficavam longe) */
@@ -2323,19 +2333,14 @@ img {
   .packages .liquid i:nth-child(2) { right: -260px; top: 330px; }
   .packages .liquid i:nth-child(3) { bottom: auto; left: 8%; top: 560px; }
 
-  .packages[data-flute] .pk-grid > .pk {
-    -webkit-backdrop-filter: url(#pk-flute) blur(0.6px) brightness(1.18);
-    backdrop-filter: url(#pk-flute) blur(0.6px) brightness(1.18);
-  }
-
   .pk-grid > .pk {
     /* mesmo vidro canelado do desktop; Safari sem suporte cai no desfoque + estrias */
-    -webkit-backdrop-filter: blur(3px) brightness(1.15);
-    backdrop-filter: blur(3px) brightness(1.15);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
     /* menos tinta que no desktop: o que passa atrás aparece e o vidro deixa de parecer opaco */
     background:
-      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 70%),
-      linear-gradient(180deg, rgba(37, 37, 34, 0.2) 0%, rgba(37, 37, 34, 0.34) 38%, rgba(37, 37, 34, 0.66) 100%);
+      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, rgba(37, 37, 34, 0.08) 0%, rgba(37, 37, 34, 0.26) 40%, rgba(37, 37, 34, 0.66) 100%);
     border: 0;
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), 0 4px 14px rgba(0, 0, 0, 0.25);
     flex: 0 0 calc(100% - var(--gutter) * 2 - var(--pk-peek));
@@ -2393,8 +2398,8 @@ img {
 
   .pk-grid > .pk--featured {
     background:
-      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 70%),
-      linear-gradient(180deg, rgba(243, 241, 235, 0.14) 0%, rgba(37, 37, 34, 0.34) 40%, rgba(37, 37, 34, 0.62) 100%);
+      radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, rgba(243, 241, 235, 0.1) 0%, rgba(37, 37, 34, 0.28) 40%, rgba(37, 37, 34, 0.62) 100%);
   }
 
   .pk-dot--active { flex: 2.2; }
