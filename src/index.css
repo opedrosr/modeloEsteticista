@@ -2288,7 +2288,7 @@ img {
     display: flex;
     gap: 14px;
     margin-inline: calc(var(--gutter) * -1);
-    margin-top: -29cqw;
+    margin-top: -41cqw;
     overflow-x: auto;
     overflow-y: hidden;
     overscroll-behavior-x: contain;
@@ -2312,8 +2312,8 @@ img {
 
   .pk-word {
     max-width: none;
-    transform: translate3d(calc(var(--pk-p, 0) * -52cqw), 0, 0);
-    width: 152cqw;
+    transform: translate3d(calc(var(--pk-p, 0) * -170cqw), 0, 0);
+    width: 270cqw;
     will-change: transform;
   }
 
@@ -2336,8 +2336,10 @@ img {
     background:
       radial-gradient(120% 34% at 18% 0%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0) 70%),
       linear-gradient(180deg, rgba(37, 37, 34, 0.2) 0%, rgba(37, 37, 34, 0.34) 38%, rgba(37, 37, 34, 0.66) 100%);
+    border: 0;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45), 0 4px 14px rgba(0, 0, 0, 0.25);
     flex: 0 0 calc(100% - var(--gutter) * 2 - var(--pk-peek));
-    padding-top: calc(27cqw + 20px);
+    padding-top: calc(34cqw + 20px);
     min-width: 0;
     scroll-snap-align: start;
     scroll-snap-stop: always;
@@ -2385,6 +2387,9 @@ img {
     transform-origin: left;
     transition: transform 0.5s var(--ease);
   }
+
+  /* sem a linha fininha branca ao redor dos cartões */
+  .pk-grid > .pk::after { display: none; }
 
   .pk-grid > .pk--featured {
     background:
