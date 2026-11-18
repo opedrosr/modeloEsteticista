@@ -2695,6 +2695,159 @@ function Packages() {
   }, []);
   const [activePackage, setActivePackage] = useState(0);
   const packageRail = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const wordBoxRef = useRef<HTMLDivElement>(null);
+  const wordCanvas = useRef<HTMLCanvasElement>(null);
+  const fluteCanvases = useRef<(HTMLCanvasElement | null)[]>([]);
+
+  // Vidro canelado do celular, desenhado em canvas: não depende de backdrop-filter com filtro SVG
+  // (que o Safari/iPhone e o Firefox não suportam). A palavra "preços" é grande, desliza atrás dos
+  // cartões e cada estria de 12px mostra uma faixa comprimida dela, igual ao filtro do desktop.
+  useEffect(() => {
+    const stage = stageRef.current;
+    const box = wordBoxRef.current;
+    const out = wordCanvas.current;
+    const rail = packageRail.current;
+    if (!stage || !box || !out || !rail) return;
+
+    const WORD_SCALE = 2.7; // largura da palavra = 270% da largura do palco (mesmo valor do CSS: 66.15cqw de altura)
+    const RIB = 12; // largura de cada estria
+    const SRC0 = -15; // cada estria enxerga de -15px...
+    const SRCW = 42; // ...até +27px: 42px de palavra espremidos em 12px (igual ao feDisplacementMap do desktop)
+    const RADIUS = 32;
+    const mq = window.matchMedia('(max-width: 719px)');
+    const cards = Array.from(rail.children) as HTMLElement[];
+    let master: HTMLCanvasElement | null = null;
+    let wordH = 0;
+    let dpr = 1;
+    let raf = 0;
+    let alive = true;
+    let until = 0;
+
+    const roundRect = (c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+      c.beginPath();
+      c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r);
+      c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r);
+      c.arcTo(x, y, x + w, y, r);
+      c.closePath();
+    };
+
+    const schedule = () => {
+      if (!raf && alive) raf = requestAnimationFrame(paint);
+    };
+
+    function paint() {
+      raf = 0;
+      const m = master;
+      if (!m || !mq.matches) return;
+      const boxR = box!.getBoundingClientRect();
+      const sw = stage!.clientWidth;
+      const max = rail!.scrollWidth - rail!.clientWidth;
+      const p = max > 0 ? Math.min(1, Math.max(0, rail!.scrollLeft / max)) : 0;
+      // posição da palavra dentro da caixa: começa alinhada ao texto e desliza conforme os cartões passam
+      const wl = stage!.getBoundingClientRect().left - boxR.left - p * (WORD_SCALE - 1) * sw;
+
+      // palavra visível, com um "furo" onde há cartão (ali quem aparece é a versão refratada)
+      const pw = Math.round(boxR.width * dpr);
+      const ph = Math.round(wordH * dpr);
+      if (out!.width !== pw || out!.height !== ph) {
+        out!.width = pw;
+        out!.height = ph;
+      }
+      out!.style.height = `${wordH}px`;
+      const ctx = out!.getContext('2d');
+      if (!ctx) return;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, pw, ph);
+      ctx.drawImage(m, Math.round(wl * dpr), 0);
+      ctx.globalCompositeOperation = 'destination-out';
+      cards.forEach((card) => {
+        const r = card.getBoundingClientRect();
+        roundRect(ctx, (r.left - boxR.left) * dpr, (r.top - boxR.top) * dpr, r.width * dpr, r.height * dpr, RADIUS * dpr);
+        ctx.fill();
+      });
+      ctx.globalCompositeOperation = 'source-over';
+
+      // vidro de cada cartão: uma fatia da palavra por estria
+      cards.forEach((card, i) => {
+        const cv = fluteCanvases.current[i];
+        if (!cv) return;
+        const r = card.getBoundingClientRect();
+        const cy = r.top - boxR.top;
+        const h = Math.max(0, Math.min(r.height, wordH - cy));
+        const cw = Math.round(r.width * dpr);
+        const ch = Math.round(h * dpr);
+        if (cv.width !== cw || cv.height !== ch) {
+          cv.width = cw;
+          cv.height = ch;
+        }
+        cv.style.height = `${h}px`;
+        const c = cv.getContext('2d');
+        if (!c) return;
+        c.clearRect(0, 0, cw, ch);
+        if (ch <= 0) return;
+        const off = r.left - boxR.left - wl; // x do cartão dentro da palavra
+        for (let x0 = 0; x0 < r.width; x0 += RIB) {
+          c.drawImage(m, (off + x0 + SRC0) * dpr, cy * dpr, SRCW * dpr, ch, x0 * dpr, 0, RIB * dpr, ch);
+        }
+      });
+
+      if (performance.now() < until) schedule();
+    }
+
+    const build = async () => {
+      if (!mq.matches) return;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const wordW = stage.clientWidth * WORD_SCALE;
+      wordH = wordW * 0.245;
+      const size = wordW * 0.3;
+      const fam = getComputedStyle(document.documentElement).getPropertyValue('--serif').trim() || 'Georgia, serif';
+      try {
+        await document.fonts.load(`${size}px ${fam}`, 'preços');
+      } catch {
+        /* sem a fonte, usa a de reserva */
+      }
+      if (!alive) return;
+      const m = document.createElement('canvas');
+      m.width = Math.ceil(wordW * dpr);
+      m.height = Math.ceil(wordH * dpr);
+      const g = m.getContext('2d');
+      if (!g) return;
+      g.scale(dpr, dpr);
+      g.font = `${size}px ${fam}`;
+      g.fillStyle = '#f3f1eb';
+      const chars = Array.from('preços');
+      const widths = chars.map((ch) => g.measureText(ch).width);
+      const extra = (wordW * 0.988 - widths.reduce((a, b) => a + b, 0)) / (chars.length - 1);
+      let x = wordW * 0.004;
+      chars.forEach((ch, i) => {
+        g.fillText(ch, x, wordH * (172 / 245));
+        x += widths[i] + extra;
+      });
+      master = m;
+      schedule();
+    };
+
+    const onTransition = () => {
+      until = performance.now() + 1100; // acompanha a animação de entrada dos cartões
+      schedule();
+    };
+    rail.addEventListener('scroll', schedule, { passive: true });
+    rail.addEventListener('transitionstart', onTransition);
+    const ro = new ResizeObserver(() => void build());
+    ro.observe(stage);
+    void build();
+
+    return () => {
+      alive = false;
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      rail.removeEventListener('scroll', schedule);
+      rail.removeEventListener('transitionstart', onTransition);
+    };
+  }, []);
 
   const selectPackage = (index: number) => {
     const rail = packageRail.current;
@@ -2710,10 +2863,6 @@ function Packages() {
     if (!firstCard) return;
     const gap = Number.parseFloat(getComputedStyle(rail).columnGap) || 0;
     setActivePackage(Math.max(0, Math.min(packages.length - 1, Math.round(rail.scrollLeft / (firstCard.offsetWidth + gap)))));
-    // no celular a palavra "preços" desliza atrás do vidro junto com os cartões (0 → 1)
-    const max = rail.scrollWidth - rail.clientWidth;
-    const progress = max > 0 ? Math.min(1, Math.max(0, rail.scrollLeft / max)) : 0;
-    rail.parentElement?.style.setProperty('--pk-p', progress.toFixed(3));
   };
 
   return (
@@ -2739,19 +2888,27 @@ function Packages() {
         </header>
         <h2 className="sr-only">preços e pacotes</h2>
 
-        <div className="pk-stage">
+        <div className="pk-stage" ref={stageRef}>
           {/* a palavra fica atrás dos cartões: as estrias do vidro a distorcem */}
-          <div className="pk-wordbox" aria-hidden="true">
+          <div className="pk-wordbox" aria-hidden="true" ref={wordBoxRef}>
             <svg className="pk-word" viewBox="0 0 1000 245" focusable="false">
               <text x="4" y="172" textLength={988} lengthAdjust="spacing" style={{ fontFamily: 'var(--serif)', fontSize: 300 }}>
                 preços
               </text>
             </svg>
+            <canvas className="pk-wordcv" ref={wordCanvas} />
           </div>
 
           <div className="pk-grid" ref={packageRail} onScroll={onPackageScroll}>
-            {packages.map((p) => (
+            {packages.map((p, idx) => (
               <article key={p.id} className={`pk${p.featured ? ' pk--featured' : ''}`} data-reveal>
+                <canvas
+                  className="pk__flute"
+                  aria-hidden="true"
+                  ref={(el) => {
+                    fluteCanvases.current[idx] = el;
+                  }}
+                />
                 <p className="pk__tag">{p.tag}</p>
                 <h3 className="pk__name">{p.name}</h3>
                 <p className="pk__price">
