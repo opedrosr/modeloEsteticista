@@ -2510,8 +2510,7 @@ const baPhrase = ['não', 'precisa', 'dizer', 'nada.'];
 function BeforeAfter({ onBook }: { onBook: () => void }) {
   const root = useRef<HTMLElement>(null);
   const range = useRef<HTMLInputElement>(null);
-  const imgG = useRef<SVGGElement>(null);
-  const lineRefs = useRef<(SVGTextElement | null)[]>([]);
+  const photoRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     const el = root.current;
@@ -2526,6 +2525,12 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
     }
     let raf = 0;
     let lastC = -1;
+    const lastVars: Record<string, string> = {};
+    const setVar = (k: string, v: string) => {
+      if (lastVars[k] === v) return;
+      lastVars[k] = v;
+      el.style.setProperty(`--${k}`, v);
+    };
     const tick = () => {
       raf = 0;
       const vh = window.innerHeight;
@@ -2534,18 +2539,21 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
       const a = clamp(p / 0.36, 0, 1); // escrita
       const x = sstep(0, 1, clamp((p - 0.34) / 0.2, 0, 1)); // troca: escrita sai, comparador entra
       const c = clamp((p - 0.54) / 0.4, 0, 1); // comparador corre
-      el.style.setProperty('--a', a.toFixed(4));
-      el.style.setProperty('--x', x.toFixed(4));
-      el.style.setProperty('--c', c.toFixed(4));
-      if (x > 0.6) el.setAttribute('data-live', '');
-      else el.removeAttribute('data-live');
-      if (c > 0.6) el.setAttribute('data-done', '');
-      else el.removeAttribute('data-done');
+      setVar('a', a.toFixed(3));
+      setVar('x', x.toFixed(3));
+      setVar('c', c.toFixed(3));
+      const live = x > 0.6;
+      if (live !== el.hasAttribute('data-live')) el.toggleAttribute('data-live', live);
+      const done = c > 0.6;
+      if (done !== el.hasAttribute('data-done')) el.toggleAttribute('data-done', done);
 
-      // dentro das letras: a foto desliza e cresce; as linhas se afastam, uma para cada lado
+      // dentro das letras: a foto desliza e cresce (só transform, na placa de vídeo, sem redesenhar)
       const s = 1 + a * 0.1;
-      imgG.current?.setAttribute('transform', `translate(500 420) scale(${s.toFixed(4)}) translate(${((0.5 - a) * 50 - 500).toFixed(1)} ${((0.5 - a) * 90 - 420).toFixed(1)})`);
-      lineRefs.current.forEach((t, i) => t?.setAttribute('transform', `translate(${((0.5 - a) * 34 * (i % 2 ? -1 : 1)).toFixed(1)} 0)`));
+      if (photoRef.current) {
+        const tx = (((0.5 - a) * 50) / 1000) * 100;
+        const ty = (((0.5 - a) * 90) / 840) * 100;
+        photoRef.current.style.transform = `scale(${s.toFixed(4)}) translate(${tx.toFixed(3)}%, ${ty.toFixed(3)}%)`;
+      }
 
       // só mexe no comparador enquanto a rolagem o move: depois disso a pessoa pode arrastar
       if (c !== lastC) {
@@ -2575,40 +2583,36 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
             <p className="label ba__label">06 / resultados</p>
             <h2 className="ba__title">
               <span className="sr-only">uma pele cuidada não precisa dizer nada</span>
-              <svg className="ba__svg" viewBox="0 0 1000 840" aria-hidden="true" focusable="false">
-                <defs>
-                  <filter id="ba-soft" x="-5%" y="-5%" width="110%" height="110%">
-                    <feGaussianBlur stdDeviation="8" />
-                  </filter>
-                  <mask id="ba-word" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="880">
-                    {baLines.map((l, i) => (
-                      <text
-                        key={l.text}
-                        ref={(n) => {
-                          lineRefs.current[i] = n;
-                        }}
-                        x="20"
-                        y={l.y}
-                        textLength={960}
-                        lengthAdjust="spacingAndGlyphs"
-                        fill="#fff"
-                        stroke="#fff"
-                        strokeWidth="3"
-                        strokeLinejoin="round"
-                        style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: l.size }}
-                      >
-                        {l.text}
-                      </text>
-                    ))}
-                  </mask>
-                </defs>
-                <g mask="url(#ba-word)">
-                  <rect x="-20" y="-20" width="1040" height="880" fill="#6f6c66" />
-                  <g ref={imgG}>
-                    <image href={photoSrc(baLetterPhoto, 1600)} filter="url(#ba-soft)" x="-60" y="-100" width="1120" height="1040" preserveAspectRatio="xMidYMid slice" />
-                  </g>
-                </g>
-              </svg>
+              {/* a foto anda por baixo (transform) e uma placa de areia com as letras vazadas fica parada por cima */}
+              <span className="ba__letters" aria-hidden="true">
+                <span className="ba__photo" ref={photoRef}>
+                  <Photo id={baLetterPhoto} alt="" className="ba__photo-img" sizes="(min-width: 900px) 700px, 100vw" />
+                </span>
+                <svg className="ba__cover" viewBox="0 0 1000 840" focusable="false">
+                  <defs>
+                    <mask id="ba-knock" maskUnits="userSpaceOnUse" x="-20" y="-20" width="1040" height="880">
+                      <rect x="-20" y="-20" width="1040" height="880" fill="#fff" />
+                      {baLines.map((l) => (
+                        <text
+                          key={l.text}
+                          x="20"
+                          y={l.y}
+                          textLength={960}
+                          lengthAdjust="spacingAndGlyphs"
+                          fill="#000"
+                          stroke="#000"
+                          strokeWidth="3"
+                          strokeLinejoin="round"
+                          style={{ fontFamily: 'var(--display)', fontWeight: 900, fontSize: l.size }}
+                        >
+                          {l.text}
+                        </text>
+                      ))}
+                    </mask>
+                  </defs>
+                  <rect x="-20" y="-20" width="1040" height="880" mask="url(#ba-knock)" style={{ fill: 'var(--sand)' }} />
+                </svg>
+              </span>
             </h2>
             <div className="ba__copy" aria-hidden="true">
               <p className="ba__lead">
@@ -2635,12 +2639,14 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
               <div className="ba__slider">
                 {/* cada lado: fundo desfocado da própria foto + a foto inteira, sem corte */}
                 <div className="ba__side ba__side--after">
-                  <Photo id={beforeAfter.after} alt="" className="ba__fill" lowres={240} />
+                  <Photo id={beforeAfter.after} alt="" className="ba__fill" lowres={64} />
                   <Photo id={beforeAfter.after} alt="Pele depois do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
                 </div>
-                <div className="ba__side ba__side--before">
-                  <Photo id={beforeAfter.before} alt="" className="ba__fill" lowres={240} />
-                  <Photo id={beforeAfter.before} alt="Pele antes do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
+                <div className="ba__wipe">
+                  <div className="ba__side ba__side--before">
+                    <Photo id={beforeAfter.before} alt="" className="ba__fill" lowres={64} />
+                    <Photo id={beforeAfter.before} alt="Pele antes do protocolo" className="ba__fit" sizes="(min-width: 900px) 920px, 100vw" />
+                  </div>
                 </div>
                 <span className="ba__tag ba__tag--l">antes</span>
                 <span className="ba__tag ba__tag--r">depois</span>
@@ -2681,17 +2687,161 @@ function BeforeAfter({ onBook }: { onBook: () => void }) {
 const fluteMap =
   "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='0'%3E%3Cstop offset='0' stop-color='%23008080'/%3E%3Cstop offset='1' stop-color='%23ff8080'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='12' height='8' fill='url(%23g)'/%3E%3C/svg%3E";
 
+
+/** Celular, Safari e navegadores sem filtro SVG no backdrop usam o vidro canelado "assado" em canvas. */
+function wantsBakedGlass(): boolean {
+  const ua = navigator.userAgent;
+  const webkitOnly = (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Android/.test(ua)) || /CriOS|FxiOS|EdgiOS/.test(ua);
+  return webkitOnly || window.matchMedia('(max-width: 719px)').matches;
+}
+
+let fluteTile: Promise<Uint8ClampedArray> | null = null;
+/** Lê o mapa de deslocamento do vidro (o mesmo usado no filtro SVG): 12×8 px de R/G. */
+function loadFluteTile(): Promise<Uint8ClampedArray> {
+  if (!fluteTile) {
+    fluteTile = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const cv = document.createElement('canvas');
+          cv.width = 12;
+          cv.height = 8;
+          const cx = cv.getContext('2d', { willReadFrequently: true });
+          if (!cx) throw new Error('canvas');
+          cx.drawImage(img, 0, 0, 12, 8);
+          resolve(cx.getImageData(0, 0, 12, 8).data);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = reject;
+      img.src = fluteMap;
+    });
+  }
+  return fluteTile;
+}
+
+/**
+ * Desenha, para cada cartão, o trecho da palavra "preços" que fica atrás dele, já com o deslocamento das
+ * estrias (mesma conta do feDisplacementMap), e guarda como imagem de fundo do cartão. Roda uma vez (e ao
+ * redimensionar): na rolagem não custa nada.
+ */
+async function bakeFluteGlass(stage: HTMLElement) {
+  const word = stage.querySelector<SVGSVGElement>('.pk-word');
+  const text = word?.querySelector('text');
+  const section = stage.closest<HTMLElement>('.packages');
+  const rail = stage.querySelector<HTMLElement>('.pk-grid');
+  const cards = Array.from(stage.querySelectorAll<HTMLElement>('.pk'));
+  if (!word || !text || !section || !rail || !cards.length) throw new Error('sem palavra');
+
+  const cs = getComputedStyle(text);
+  const str = text.textContent ?? '';
+  const wr = word.getBoundingClientRect();
+  const k = wr.width / 1000; // px por unidade do viewBox
+  if (!k) throw new Error('sem largura');
+  const fontPx = 300 * k;
+  await document.fonts.load(`${fontPx}px ${cs.fontFamily}`, str).catch(() => []);
+  await document.fonts.ready;
+  const tile = await loadFluteTile();
+
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  const scale = 14 + 16 * Math.min(1, k); // deslocamento em px: 30 no computador, menor quando a palavra é pequena
+  const scrolls = ['auto', 'scroll'].includes(getComputedStyle(rail).overflowX);
+  const bg = getComputedStyle(section).backgroundColor || '#252522';
+  const sand = getComputedStyle(document.documentElement).getPropertyValue('--sand').trim() || '#f3f1eb';
+  const glyphs = Array.from(str).map((ch, i) => ({ ch, x: text.getStartPositionOfChar(i).x * k }));
+  const baseY = 172 * k;
+
+  for (const card of cards) {
+    const cw = card.offsetWidth;
+    const top = card.offsetTop;
+    const rh = Math.min(Math.ceil(wr.height - top), card.offsetHeight);
+    if (rh < 4 || cw < 4) continue;
+    const ox = scrolls ? 0 : card.offsetLeft; // no carrossel, o cartão em repouso fica na borda esquerda da palavra
+    const W = Math.round(cw * d);
+    const H = Math.round(rh * d);
+
+    const src = document.createElement('canvas');
+    src.width = W;
+    src.height = H;
+    const sx = src.getContext('2d', { willReadFrequently: true });
+    if (!sx) throw new Error('canvas');
+    sx.fillStyle = bg;
+    sx.fillRect(0, 0, W, H);
+    sx.fillStyle = sand;
+    sx.font = `${fontPx * d}px ${cs.fontFamily}`;
+    sx.textBaseline = 'alphabetic';
+    glyphs.forEach((g) => sx.fillText(g.ch, (g.x - ox) * d, (baseY - top) * d));
+    const sd = sx.getImageData(0, 0, W, H).data;
+
+    const out = sx.createImageData(W, H);
+    const od = out.data;
+    const fade = 8 * d;
+    for (let Y = 0; Y < H; Y++) {
+      const ty = Math.floor(Y / d) % 8;
+      for (let X = 0; X < W; X++) {
+        const ti = (ty * 12 + (Math.floor(X / d) % 12)) * 4;
+        const px = Math.min(W - 1, Math.max(0, Math.round(X + scale * (tile[ti] / 255 - 0.5) * d)));
+        const py = Math.min(H - 1, Math.max(0, Math.round(Y + scale * (tile[ti + 1] / 255 - 0.5) * d)));
+        const si = (py * W + px) * 4;
+        const oi = (Y * W + X) * 4;
+        od[oi] = Math.min(255, sd[si] * 1.12);
+        od[oi + 1] = Math.min(255, sd[si + 1] * 1.12);
+        od[oi + 2] = Math.min(255, sd[si + 2] * 1.12);
+        od[oi + 3] = Math.round(255 * Math.min(1, (H - Y) / fade)); // some suave na borda de baixo
+      }
+    }
+    sx.putImageData(out, 0, 0);
+    // putImageData não mistura: o canvas fica com o resultado exato (inclusive o alfa)
+    card.style.setProperty('--pk-img', `url(${src.toDataURL('image/png')})`);
+    card.style.setProperty('--pk-rh', `${rh}px`);
+  }
+}
+
 function Packages() {
   // Mantém o filtro SVG de refração ativo também no mobile.
   // Navegadores sem suporte ao backdrop-filter SVG usam o fallback de estrias abaixo.
-  // Vidro canelado (refração) ligado só enquanto a seção está na tela: fora dela o filtro não custa nada.
+  // Vidro canelado: no Chrome do computador o navegador refrata a palavra (filtro SVG no backdrop, ligado só
+  // enquanto a seção está na tela). No celular e no Safari esse filtro não existe ou pesa demais, então a
+  // palavra distorcida é desenhada uma vez num canvas e vira a camada de baixo de cada cartão.
   const [flute, setFlute] = useState(false);
+  const [baked, setBaked] = useState(false);
   useEffect(() => {
     const el = document.getElementById('pacotes');
     if (!el) return;
     const io = new IntersectionObserver(([e]) => setFlute(e.isIntersecting), { rootMargin: '150px 0px' });
     io.observe(el);
-    return () => io.disconnect();
+
+    let timer = 0;
+    let gen = 0;
+    const run = async () => {
+      const my = ++gen;
+      const stage = el.querySelector<HTMLElement>('.pk-stage');
+      if (!stage || !wantsBakedGlass()) {
+        setBaked(false);
+        return;
+      }
+      try {
+        await bakeFluteGlass(stage);
+        if (my === gen) setBaked(true);
+      } catch {
+        if (my === gen) setBaked(false);
+      }
+    };
+    const later = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(run, 180);
+    };
+    run();
+    const ro = new ResizeObserver(later);
+    const stage = el.querySelector('.pk-stage');
+    if (stage) ro.observe(stage);
+    return () => {
+      gen++;
+      window.clearTimeout(timer);
+      io.disconnect();
+      ro.disconnect();
+    };
   }, []);
   const [activePackage, setActivePackage] = useState(0);
   const packageRail = useRef<HTMLDivElement>(null);
@@ -2713,7 +2863,7 @@ function Packages() {
   };
 
   return (
-    <section className="packages section section--ink" id="pacotes" data-flute={flute ? 'on' : undefined}>
+    <section className="packages section section--ink" id="pacotes" data-flute={flute && !baked ? 'on' : undefined} data-baked={baked ? '' : undefined}>
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true" focusable="false">
         <filter id="pk-flute" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB">
           <feImage href={fluteMap} x="0" y="0" width="12" height="8" result="tile" />
